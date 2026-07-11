@@ -266,7 +266,7 @@ function toMGRS(lat,lng){
 function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
 
 // ---- per-team color ----
-const TEAMPAL=['#4FC3F7','#FF8A65','#AED581','#BA68C8','#4DD0E1','#FFD54F','#F06292','#90A4AE'];
+const TEAMPAL=['#56B4E9','#E69F00','#009E73','#CC79A7','#D55E00','#0072B2','#B0BEC5','#F0E442'];
 function teamColorForNo(no){ const n=parseInt(no,10); const idx=isNaN(n)?0:Math.abs(n-1)%TEAMPAL.length; return TEAMPAL[idx]; }
 let TEAMNO={}, TEAMCOLORS={};
 
