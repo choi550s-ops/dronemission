@@ -1,7 +1,7 @@
 -- IUCCS initial schema. All statements are idempotent (IF NOT EXISTS).
 -- Run automatically by bin/migrate.php on each deploy.
 
-CREATE TABLE IF NOT EXISTS teams (
+CREATE TABLE IF NOT EXISTS iuccs_teams (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   team_no       VARCHAR(16)  NOT NULL UNIQUE,
   name          VARCHAR(64)  NOT NULL,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS teams (
   created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE IF NOT EXISTS iuccs_users (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   team_id       INT UNSIGNED NULL,
   login_id      VARCHAR(32)  NOT NULL UNIQUE,
@@ -19,10 +19,10 @@ CREATE TABLE IF NOT EXISTS users (
   role          ENUM('admin','leader','operator','fire_coord','observer') NOT NULL DEFAULT 'operator',
   display_name  VARCHAR(64)  NULL,
   created_at    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_users_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+  FOREIGN KEY (team_id) REFERENCES iuccs_teams(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS drones (
+CREATE TABLE IF NOT EXISTS iuccs_drones (
   id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   team_id        INT UNSIGNED NULL,
   code           VARCHAR(32)  NOT NULL UNIQUE,
@@ -35,10 +35,10 @@ CREATE TABLE IF NOT EXISTS drones (
   gps_status     ENUM('fixed','searching','none')  DEFAULT 'fixed',
   status         ENUM('available','in_use','maintenance','down') DEFAULT 'available',
   updated_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_drones_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE SET NULL
+  FOREIGN KEY (team_id) REFERENCES iuccs_teams(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS missions (
+CREATE TABLE IF NOT EXISTS iuccs_missions (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   team_id       INT UNSIGNED NOT NULL,
   type          ENUM('recon','attack') NOT NULL,
@@ -52,10 +52,10 @@ CREATE TABLE IF NOT EXISTS missions (
   roe_confirmed TINYINT(1)   NOT NULL DEFAULT 0,
   issued_by     INT UNSIGNED NULL,
   issued_at     DATETIME     DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_missions_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+  FOREIGN KEY (team_id) REFERENCES iuccs_teams(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS reports (
+CREATE TABLE IF NOT EXISTS iuccs_reports (
   id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   mission_id   INT UNSIGNED NULL,
   team_id      INT UNSIGNED NOT NULL,
@@ -76,10 +76,10 @@ CREATE TABLE IF NOT EXISTS reports (
   photo_path   VARCHAR(255) NULL,
   acknowledged TINYINT(1)   NOT NULL DEFAULT 0,
   created_at   DATETIME     DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_reports_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+  FOREIGN KEY (team_id) REFERENCES iuccs_teams(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS fire_requests (
+CREATE TABLE IF NOT EXISTS iuccs_fire_requests (
   id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   team_id      INT UNSIGNED NOT NULL,
   coord        VARCHAR(32)  NULL,
@@ -90,10 +90,10 @@ CREATE TABLE IF NOT EXISTS fire_requests (
                NOT NULL DEFAULT 'received',
   mode         ENUM('real','sim') NOT NULL DEFAULT 'real',
   created_at   DATETIME     DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT fk_fire_team FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+  FOREIGN KEY (team_id) REFERENCES iuccs_teams(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS activity_log (
+CREATE TABLE IF NOT EXISTS iuccs_activity_log (
   id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   actor      VARCHAR(64)  NULL,
   action     VARCHAR(64)  NOT NULL,
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS activity_log (
   created_at DATETIME     DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS sessions (
+CREATE TABLE IF NOT EXISTS iuccs_sessions (
   token      CHAR(64)     PRIMARY KEY,
   user_id    INT UNSIGNED NOT NULL,
   team_id    INT UNSIGNED NULL,

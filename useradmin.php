@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msg = '아이디와 새 비밀번호를 입력하세요.';
             } else {
                 $hash = password_hash($pw, PASSWORD_DEFAULT);
-                $st = $pdo->prepare("UPDATE users SET password_hash = ? WHERE login_id = ?");
+                $st = $pdo->prepare("UPDATE iuccs_users SET password_hash = ? WHERE login_id = ?");
                 $st->execute(array($hash, $login));
                 if ($st->rowCount() > 0) { $ok = true; $msg = "'" . $login . "' 비밀번호가 변경되었습니다."; }
                 else { $msg = "'" . $login . "' 계정을 찾지 못했습니다."; }
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msg = '새 비밀번호를 입력하세요.';
             } else {
                 $hash = password_hash($pw, PASSWORD_DEFAULT);
-                $n = $pdo->exec("UPDATE users SET password_hash = " . $pdo->quote($hash));
+                $n = $pdo->exec("UPDATE iuccs_users SET password_hash = " . $pdo->quote($hash));
                 $ok = true; $msg = "전체 " . $n . "개 계정의 비밀번호가 변경되었습니다.";
             }
         } elseif ($action === 'create') {
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $hash = password_hash($pw, PASSWORD_DEFAULT);
                 $st = $pdo->prepare(
-                    "INSERT INTO users(login_id, password_hash, role, display_name)
+                    "INSERT INTO iuccs_users(login_id, password_hash, role, display_name)
                      VALUES (?,?,?,?)
                      ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role)"
                 );
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$users = $pdo->query("SELECT id, login_id, role, team_id, display_name FROM users ORDER BY id")->fetchAll();
+$users = $pdo->query("SELECT id, login_id, role, team_id, display_name FROM iuccs_users ORDER BY id")->fetchAll();
 $T = h($token);
 $roleKo = array('admin'=>'관리자','leader'=>'팀장','operator'=>'운용자','fire_coord'=>'화력협조','observer'=>'참관');
 ?>

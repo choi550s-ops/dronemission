@@ -14,14 +14,14 @@ class Migrator
         $pdo = Database::pdo();
 
         $pdo->exec(
-            "CREATE TABLE IF NOT EXISTS schema_migrations (
+            "CREATE TABLE IF NOT EXISTS iuccs_schema_migrations (
                 version    VARCHAR(64) PRIMARY KEY,
                 applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
 
         $applied = array_flip(
-            $pdo->query("SELECT version FROM schema_migrations")->fetchAll(PDO::FETCH_COLUMN)
+            $pdo->query("SELECT version FROM iuccs_schema_migrations")->fetchAll(PDO::FETCH_COLUMN)
         );
 
         $files = glob(__DIR__ . '/../db/migrations/*.sql');
@@ -40,7 +40,7 @@ class Migrator
                 }
                 $pdo->exec($stmt);
             }
-            $pdo->prepare("INSERT INTO schema_migrations(version) VALUES (?)")->execute([$version]);
+            $pdo->prepare("INSERT INTO iuccs_schema_migrations(version) VALUES (?)")->execute([$version]);
         }
 
         $log = array_merge($log, self::seedUsers($pdo));
@@ -63,7 +63,7 @@ class Migrator
     private static function seedUsers($pdo)
     {
         $log = [];
-        $count = (int) $pdo->query("SELECT COUNT(*) FROM users")->fetchColumn();
+        $count = (int) $pdo->query("SELECT COUNT(*) FROM iuccs_users")->fetchColumn();
         if ($count > 0) {
             return ['users exist — skip seeding'];
         }
@@ -71,14 +71,14 @@ class Migrator
         $hash = password_hash($initPassword, PASSWORD_DEFAULT);
 
         $pdo->prepare(
-            "INSERT INTO users(team_id, login_id, password_hash, role, display_name)
+            "INSERT INTO iuccs_users(team_id, login_id, password_hash, role, display_name)
              VALUES (NULL, ?, ?, 'admin', ?)"
         )->execute(['admin', $hash, '관리자']);
 
-        $teams = $pdo->query("SELECT id, team_no FROM teams")->fetchAll();
+        $teams = $pdo->query("SELECT id, team_no FROM iuccs_teams")->fetchAll();
         foreach ($teams as $t) {
             $pdo->prepare(
-                "INSERT INTO users(team_id, login_id, password_hash, role, display_name)
+                "INSERT INTO iuccs_users(team_id, login_id, password_hash, role, display_name)
                  VALUES (?, ?, ?, 'operator', ?)"
             )->execute([$t['id'], $t['team_no'], $hash, $t['team_no'] . '팀 운용자']);
         }

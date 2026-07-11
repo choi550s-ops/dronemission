@@ -34,7 +34,7 @@ function log_activity($actor, $action, $entity = null, $entityId = null, $detail
 {
     try {
         $st = Database::pdo()->prepare(
-            "INSERT INTO activity_log(actor, action, entity, entity_id, detail) VALUES (?,?,?,?,?)"
+            "INSERT INTO iuccs_activity_log(actor, action, entity, entity_id, detail) VALUES (?,?,?,?,?)"
         );
         $st->execute(array($actor, $action, $entity, $entityId, $detail));
     } catch (Exception $e) {

@@ -69,18 +69,18 @@ function route($path, $method)
         Auth::require_auth();
         $teams = $pdo->query(
             "SELECT t.id, t.team_no, t.name, t.status, t.coord, t.last_login_at,
-                    (SELECT COUNT(*) FROM drones d WHERE d.team_id = t.id) AS drone_count
-               FROM teams t ORDER BY t.team_no"
+                    (SELECT COUNT(*) FROM iuccs_drones d WHERE d.team_id = t.id) AS drone_count
+               FROM iuccs_teams t ORDER BY t.team_no"
         )->fetchAll();
         $counts = array(
             'missions_pending' => (int) $pdo->query(
-                "SELECT COUNT(*) FROM missions WHERE status IN ('issued','pending_approval')"
+                "SELECT COUNT(*) FROM iuccs_missions WHERE status IN ('issued','pending_approval')"
             )->fetchColumn(),
             'reports_unack'    => (int) $pdo->query(
-                "SELECT COUNT(*) FROM reports WHERE acknowledged = 0"
+                "SELECT COUNT(*) FROM iuccs_reports WHERE acknowledged = 0"
             )->fetchColumn(),
             'fire_pending'     => (int) $pdo->query(
-                "SELECT COUNT(*) FROM fire_requests WHERE status IN ('received','reviewing')"
+                "SELECT COUNT(*) FROM iuccs_fire_requests WHERE status IN ('received','reviewing')"
             )->fetchColumn(),
         );
         json_out(array('teams' => $teams, 'counts' => $counts, 'server_time' => date('c')));
@@ -88,16 +88,16 @@ function route($path, $method)
 
     if ($path === '/api/teams') {
         Auth::require_auth();
-        json_out(array('teams' => $pdo->query("SELECT * FROM teams ORDER BY team_no")->fetchAll()));
+        json_out(array('teams' => $pdo->query("SELECT * FROM iuccs_teams ORDER BY team_no")->fetchAll()));
     }
     if ($path === '/api/drones') {
         Auth::require_auth();
         $tid = pval($_GET, 'team_id');
         if ($tid) {
-            $st = $pdo->prepare("SELECT * FROM drones WHERE team_id = ? ORDER BY code");
+            $st = $pdo->prepare("SELECT * FROM iuccs_drones WHERE team_id = ? ORDER BY code");
             $st->execute(array($tid));
         } else {
-            $st = $pdo->query("SELECT * FROM drones ORDER BY code");
+            $st = $pdo->query("SELECT * FROM iuccs_drones ORDER BY code");
         }
         json_out(array('drones' => $st->fetchAll()));
     }
@@ -105,7 +105,7 @@ function route($path, $method)
     if ($path === '/api/missions' && $method === 'GET') {
         $s   = Auth::require_auth();
         $tid = pval($_GET, 'team_id', $s['team_id']);
-        $st  = $pdo->prepare("SELECT * FROM missions WHERE team_id = ? ORDER BY issued_at DESC LIMIT 50");
+        $st  = $pdo->prepare("SELECT * FROM iuccs_missions WHERE team_id = ? ORDER BY issued_at DESC LIMIT 50");
         $st->execute(array($tid));
         json_out(array('missions' => $st->fetchAll()));
     }
@@ -116,7 +116,7 @@ function route($path, $method)
         $status = ($type === 'attack') ? 'pending_approval' : 'issued';
         $mode   = (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real';
         $st = $pdo->prepare(
-            "INSERT INTO missions(team_id, type, coord, route, method, mode, status, issued_by)
+            "INSERT INTO iuccs_missions(team_id, type, coord, route, method, mode, status, issued_by)
              VALUES (?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
@@ -130,7 +130,7 @@ function route($path, $method)
     if ($path === '/api/missions/ack' && $method === 'POST') {
         Auth::require_auth();
         $b = body_json();
-        $pdo->prepare("UPDATE missions SET status = 'acknowledged' WHERE id = ? AND status = 'issued'")
+        $pdo->prepare("UPDATE iuccs_missions SET status = 'acknowledged' WHERE id = ? AND status = 'issued'")
             ->execute(array(pval($b, 'id', 0)));
         json_out(array('ok' => true));
     }
@@ -141,7 +141,7 @@ function route($path, $method)
             json_out(array('error' => 'roe_required', 'message' => '교전규칙(ROE) 확인이 필요합니다.'), 422);
         }
         $pdo->prepare(
-            "UPDATE missions SET approved = 1, roe_confirmed = 1, status = 'issued'
+            "UPDATE iuccs_missions SET approved = 1, roe_confirmed = 1, status = 'issued'
               WHERE id = ? AND type = 'attack'"
         )->execute(array(pval($b, 'id', 0)));
         log_activity('user#' . $s['user_id'], 'mission_approve', 'mission', pval($b, 'id', 0), 'roe_confirmed');
@@ -150,14 +150,14 @@ function route($path, $method)
 
     if ($path === '/api/reports' && $method === 'GET') {
         Auth::require_auth();
-        json_out(array('reports' => $pdo->query("SELECT * FROM reports ORDER BY created_at DESC LIMIT 100")->fetchAll()));
+        json_out(array('reports' => $pdo->query("SELECT * FROM iuccs_reports ORDER BY created_at DESC LIMIT 100")->fetchAll()));
     }
     if ($path === '/api/reports' && $method === 'POST') {
         $s   = Auth::require_auth();
         $b   = body_json();
         $kind = in_array(pval($b, 'kind', ''), array('recon', 'attack', 'photo'), true) ? $b['kind'] : 'recon';
         $st  = $pdo->prepare(
-            "INSERT INTO reports
+            "INSERT INTO iuccs_reports
                 (mission_id, team_id, kind, mode, coord, troops, trucks, vehicles,
                  armed, unarmed, scale, kia, serious, minor, failed, note)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
@@ -177,19 +177,19 @@ function route($path, $method)
     if ($path === '/api/reports/ack' && $method === 'POST') {
         Auth::require_auth(array('admin', 'leader', 'fire_coord'));
         $b = body_json();
-        $pdo->prepare("UPDATE reports SET acknowledged = 1 WHERE id = ?")->execute(array(pval($b, 'id', 0)));
+        $pdo->prepare("UPDATE iuccs_reports SET acknowledged = 1 WHERE id = ?")->execute(array(pval($b, 'id', 0)));
         json_out(array('ok' => true));
     }
 
     if ($path === '/api/fire-requests' && $method === 'GET') {
         Auth::require_auth();
-        json_out(array('fire_requests' => $pdo->query("SELECT * FROM fire_requests ORDER BY created_at DESC LIMIT 50")->fetchAll()));
+        json_out(array('fire_requests' => $pdo->query("SELECT * FROM iuccs_fire_requests ORDER BY created_at DESC LIMIT 50")->fetchAll()));
     }
     if ($path === '/api/fire-requests' && $method === 'POST') {
         $s  = Auth::require_auth();
         $b  = body_json();
         $st = $pdo->prepare(
-            "INSERT INTO fire_requests(team_id, coord, target, scale, support_from, mode)
+            "INSERT INTO iuccs_fire_requests(team_id, coord, target, scale, support_from, mode)
              VALUES (?,?,?,?,?,?)"
         );
         $st->execute(array(
@@ -206,7 +206,7 @@ function route($path, $method)
         $b       = body_json();
         $allowed = array('received', 'reviewing', 'approved', 'held', 'executed', 'rejected');
         $stt     = in_array(pval($b, 'status', ''), $allowed, true) ? $b['status'] : 'received';
-        $pdo->prepare("UPDATE fire_requests SET status = ? WHERE id = ?")->execute(array($stt, pval($b, 'id', 0)));
+        $pdo->prepare("UPDATE iuccs_fire_requests SET status = ? WHERE id = ?")->execute(array($stt, pval($b, 'id', 0)));
         log_activity('user#' . $s['user_id'], 'fire_status', 'fire_request', pval($b, 'id', 0), $stt);
         json_out(array('ok' => true));
     }

@@ -10,8 +10,8 @@ class Auth
         $pdo = Database::pdo();
         $st = $pdo->prepare(
             "SELECT u.*, t.team_no
-               FROM users u
-               LEFT JOIN teams t ON t.id = u.team_id
+               FROM iuccs_users u
+               LEFT JOIN iuccs_teams t ON t.id = u.team_id
               WHERE u.login_id = ? LIMIT 1"
         );
         $st->execute(array($loginId));
@@ -23,12 +23,12 @@ class Auth
         $mode  = ($mode === 'sim') ? 'sim' : 'real';
         $exp   = date('Y-m-d H:i:s', time() + 12 * 3600);
         $pdo->prepare(
-            "INSERT INTO sessions(token, user_id, team_id, role, mode, expires_at)
+            "INSERT INTO iuccs_sessions(token, user_id, team_id, role, mode, expires_at)
              VALUES (?,?,?,?,?,?)"
         )->execute(array($token, $u['id'], $u['team_id'], $u['role'], $mode, $exp));
 
         if ($u['team_id']) {
-            $pdo->prepare("UPDATE teams SET last_login_at = NOW() WHERE id = ?")
+            $pdo->prepare("UPDATE iuccs_teams SET last_login_at = NOW() WHERE id = ?")
                 ->execute(array($u['team_id']));
         }
         log_activity($loginId, 'login', 'user', $u['id'], 'mode=' . $mode);
@@ -50,7 +50,7 @@ class Auth
             return null;
         }
         $st = Database::pdo()->prepare(
-            "SELECT * FROM sessions WHERE token = ? AND expires_at > NOW() LIMIT 1"
+            "SELECT * FROM iuccs_sessions WHERE token = ? AND expires_at > NOW() LIMIT 1"
         );
         $st->execute(array($token));
         $s = $st->fetch();
@@ -73,7 +73,7 @@ class Auth
     {
         $token = bearer_token();
         if ($token) {
-            Database::pdo()->prepare("DELETE FROM sessions WHERE token = ?")->execute(array($token));
+            Database::pdo()->prepare("DELETE FROM iuccs_sessions WHERE token = ?")->execute(array($token));
         }
     }
 }
