@@ -97,7 +97,7 @@
     box-shadow:none!important;padding:1px 7px!important;border-radius:5px!important;font-size:11px!important;font-weight:800!important}
   .teamlabel:before{display:none!important}
   .diamond-icon{background:transparent!important;border:none!important}
-  .diamond{width:13px;height:13px;background:#E24A3B;border:2px solid #0b1626;transform:rotate(45deg);box-shadow:0 0 4px rgba(226,74,59,.7)}
+  .diamond{width:20px;height:20px;background:#E24A3B;border:2px solid #0b1626;transform:rotate(45deg);box-shadow:0 0 6px rgba(226,74,59,.7)}
   @keyframes hostileBlink{0%,100%{opacity:1}50%{opacity:.32}}
   .diamond.blinking{animation:hostileBlink 1.1s ease-in-out infinite}
   .friendly-icon{background:transparent!important;border:none!important}
@@ -418,7 +418,7 @@ function toggleLayer(el){
   const g=LG[k]; if(!g)return; if(layerOn[k]) g.addTo(MAP); else MAP.removeLayer(g);
 }
 function diamondIcon(blink){
-  return L.divIcon({className:'diamond-icon',html:'<div class="diamond'+(blink?' blinking':'')+'"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+  return L.divIcon({className:'diamond-icon',html:'<div class="diamond'+(blink?' blinking':'')+'"></div>',iconSize:[21,21],iconAnchor:[10.5,10.5]});
 }
 function friendlySquareIcon(){
   return L.divIcon({className:'friendly-icon',html:'<div class="friendly-square"></div>',iconSize:[12,12],iconAnchor:[6,6]});
