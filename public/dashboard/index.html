@@ -45,6 +45,11 @@
   .mapcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:18px}
   .maphd{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
   #map{height:440px;border-radius:10px;border:1px solid var(--line);background:#0b1626;z-index:1}
+  .routemap{height:210px;border-radius:10px;border:1px solid var(--line);margin-top:8px;background:#0b1626;z-index:1}
+  .mcoords{font-size:12px;color:var(--text);margin-top:8px;max-height:90px;overflow:auto;line-height:1.6}
+  .mcoords .mono{color:#cfe0f0}
+  .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#1a1206;font-weight:800;font-size:11px;padding:0}
+  .wp:before,.wp:after{display:none!important}
   .lyr{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);cursor:pointer;user-select:none}
   .lyr.on{background:var(--navy);color:#fff;border-color:var(--steel)}
   .leg{display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:10px}
@@ -141,9 +146,13 @@
         <h2>임무 지시</h2>
         <div style="display:flex;flex-direction:column;gap:9px">
           <select id="m_team"></select>
-          <select id="m_type"><option value="recon">정찰</option><option value="attack">공격</option></select>
-          <input id="m_coord" class="mono" placeholder="WQ 0000 0000">
-          <input id="m_route" placeholder="경로/방식 (예: 3지점 / 표적지정)">
+          <select id="m_type" onchange="clearRoute()"><option value="recon">정찰</option><option value="attack">공격</option></select>
+          <input id="m_coord" class="mono" placeholder="WQ 0000 0000 (선택)">
+          <input id="m_route" placeholder="비고/방식 (예: 자율 / 표적지정)">
+          <div class="lbl" style="margin-top:2px;letter-spacing:.02em">경로 지정 — 지도를 눌러 경유점 추가</div>
+          <div id="m_map" class="routemap"></div>
+          <div class="mcoords" id="m_coords"><span class="muted">지도를 눌러 경로를 지정하세요</span></div>
+          <button class="btn btn-ghost" style="padding:8px" onclick="clearRoute()">경로 초기화</button>
           <button class="btn btn-amber" style="padding:11px" onclick="issueMission()">임무 하달</button>
           <div class="muted" style="font-size:11.5px">※ 공격 임무는 승인·ROE 확인 후 하달됩니다.</div>
         </div>
@@ -179,7 +188,7 @@ async function login(){
     const r=await api('/login','POST',{login_id:document.getElementById('l_id').value.trim(),password:document.getElementById('l_pw').value});
     TOKEN=r.token; ROLE=r.role; sessionStorage.setItem('iuccs_dash_token',TOKEN);
     document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='block';
-    startClock(); loadAll(); setInterval(loadAll,10000);
+    startClock(); loadAll(); setInterval(loadAll,10000); initMissionMap();
   }catch(e){ document.getElementById('l_err').style.display='block'; }
 }
 function startClock(){setInterval(()=>document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8),1000);}
@@ -221,6 +230,41 @@ async function loadMap(){
     });
     if(pts.length){ try{ MAP.fitBounds(pts,{padding:[40,40],maxZoom:15}); }catch(e){} }
   }catch(e){}
+}
+
+// ---- mission route drawer ----
+let ROUTE=[], MMAP=null, MLINE=null, MMARK=[];
+function initMissionMap(){
+  if(MMAP||typeof L==='undefined'||!document.getElementById('m_map'))return;
+  MMAP=L.map('m_map',{zoomControl:true}).setView([37.555,127.01],13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'&copy; OSM &copy; CARTO'}).addTo(MMAP);
+  MLINE=L.polyline([],{color:'#E8A33D',weight:3,dashArray:'6,7'}).addTo(MMAP);
+  MMAP.on('click',function(e){ addRoutePoint(e.latlng.lat,e.latlng.lng); });
+  setTimeout(function(){ if(MMAP) MMAP.invalidateSize(); },250);
+}
+function addRoutePoint(lat,lng){
+  const type=document.getElementById('m_type').value;
+  if(type==='attack'){ ROUTE=[[lat,lng]]; } else { ROUTE.push([lat,lng]); }
+  redrawRoute();
+}
+function redrawRoute(){
+  if(!MMAP)return;
+  MMARK.forEach(function(m){MMAP.removeLayer(m);}); MMARK=[];
+  ROUTE.forEach(function(p,i){
+    const m=L.circleMarker(p,{radius:9,color:'#0b1626',weight:2,fillColor:'#E8A33D',fillOpacity:.95})
+      .bindTooltip(String(i+1),{permanent:true,direction:'center',className:'wp'}).addTo(MMAP);
+    MMARK.push(m);
+  });
+  MLINE.setLatLngs(ROUTE);
+  const el=document.getElementById('m_coords');
+  el.innerHTML = ROUTE.length ? ROUTE.map(function(p,i){return '<div>'+(i+1)+') <span class="mono">'+p[0].toFixed(5)+', '+p[1].toFixed(5)+'</span></div>';}).join('')
+    : '<span class="muted">지도를 눌러 경로를 지정하세요</span>';
+}
+function clearRoute(){
+  if(MMAP){ MMARK.forEach(function(m){MMAP.removeLayer(m);}); }
+  MMARK=[]; ROUTE=[];
+  if(MLINE) MLINE.setLatLngs([]);
+  const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">지도를 눌러 경로를 지정하세요</span>';
 }
 
 async function loadDash(){
@@ -275,15 +319,18 @@ async function issueMission(){
   const body={team_id:document.getElementById('m_team').value,type:document.getElementById('m_type').value,
     coord:document.getElementById('m_coord').value,route:document.getElementById('m_route').value};
   if(body.type==='attack'){ body.method='designated'; }
+  if(ROUTE.length){ body.route_points=ROUTE; body.lat=ROUTE[0][0]; body.lng=ROUTE[0][1];
+    if(!body.coord){ body.coord=ROUTE[0][0].toFixed(5)+', '+ROUTE[0][1].toFixed(5); } }
   try{ const r=await api('/missions','POST',body);
-    alert(r.status==='pending_approval'?'공격 임무 생성됨 — 승인·ROE 확인 대기':'임무 하달됨');
-    loadDash();
+    alert(r.status==='pending_approval'?'공격 임무 생성됨 — 승인·ROE 확인 대기':'임무 하달됨 (경로 '+ROUTE.length+'개 지점)');
+    clearRoute(); document.getElementById('m_coord').value=''; document.getElementById('m_route').value='';
+    loadDash(); loadMap();
   }catch(e){ alert(e.error==='forbidden'?'권한이 없습니다 (관리자/팀장).':'하달 실패'); }
 }
 function logout(){ sessionStorage.removeItem('iuccs_dash_token'); location.reload(); }
 
 // auto-enter if token present
-if(TOKEN){ document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='block'; startClock(); loadAll(); setInterval(loadAll,10000); }
+if(TOKEN){ document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='block'; startClock(); loadAll(); setInterval(loadAll,10000); initMissionMap(); }
 </script>
 </body>
 </html>

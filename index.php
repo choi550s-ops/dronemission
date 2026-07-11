@@ -132,13 +132,15 @@ function route($path, $method)
         $type = (pval($b, 'type', 'recon') === 'attack') ? 'attack' : 'recon';
         $status = ($type === 'attack') ? 'pending_approval' : 'issued';
         $mode   = (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real';
+        $rp = pval($b, 'route_points');
+        if (is_array($rp)) { $rp = json_encode($rp); } elseif (!is_string($rp)) { $rp = null; }
         $st = $pdo->prepare(
-            "INSERT INTO iuccs_missions(team_id, type, coord, lat, lng, route, method, mode, status, issued_by)
-             VALUES (?,?,?,?,?,?,?,?,?,?)"
+            "INSERT INTO iuccs_missions(team_id, type, coord, lat, lng, route, method, mode, status, issued_by, route_points)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'team_id', $s['team_id']), $type, pval($b, 'coord'), pval($b, 'lat'), pval($b, 'lng'),
-            pval($b, 'route'), pval($b, 'method'), $mode, $status, $s['user_id'],
+            pval($b, 'route'), pval($b, 'method'), $mode, $status, $s['user_id'], $rp,
         ));
         $id = $pdo->lastInsertId();
         log_activity('user#' . $s['user_id'], 'mission_issue', 'mission', $id, $type);
