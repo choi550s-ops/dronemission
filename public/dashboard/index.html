@@ -85,8 +85,8 @@
   .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16324b;border:1px solid var(--steel);
     color:#dff0ff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;opacity:0;transition:.3s;z-index:60;pointer-events:none}
   .toast.show{opacity:1}
-  @keyframes pulseHi{0%,100%{box-shadow:0 0 0 0 rgba(232,163,61,.6)}50%{box-shadow:0 0 0 6px rgba(232,163,61,0)}}
-  .pulse-highlight{animation:pulseHi 0.6s ease-in-out 3; border-color:var(--amber)!important}
+  @keyframes pulseHi{0%,100%{box-shadow:0 0 0 0 rgba(255,214,0,.7)}50%{box-shadow:0 0 0 7px rgba(255,214,0,0)}}
+  .pulse-highlight{animation:pulseHi 0.9s ease-in-out infinite; border-color:#FFD600!important; background-color:rgba(255,214,0,.08)!important}
   .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#12222f;font-weight:800;font-size:10.5px;padding:0}
   .wp:before,.wp:after{display:none!important}
   #drawbtn.on-draw{background:linear-gradient(180deg,#E8A33D,#C9871B);color:#1a1206;border-color:transparent}
@@ -582,7 +582,7 @@ function prefillAttackTarget(lat, lng, coord){
   const sel=document.getElementById('m_team');
   sel.focus();
   sel.classList.add('pulse-highlight');
-  setTimeout(function(){ sel.classList.remove('pulse-highlight'); }, 2000);
+  sel.addEventListener('change', function stopBlink(){ sel.classList.remove('pulse-highlight'); }, {once:true});
   toast('🎯 공격 임무 대상 지정됨 — 팀을 선택하고 "임무 하달"을 누르세요');
 }
 
