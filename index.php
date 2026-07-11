@@ -119,6 +119,72 @@ function route($path, $method)
         json_out(array('drones' => $st->fetchAll()));
     }
 
+    if ($path === '/api/drones/update' && $method === 'POST') {
+        $s  = Auth::require_auth();
+        $b  = body_json();
+        $id = pval($b, 'id');
+        if ($s['role'] !== 'admin') {
+            $chk = $pdo->prepare("SELECT team_id FROM iuccs_drones WHERE id = ?");
+            $chk->execute(array($id));
+            $d = $chk->fetch();
+            if (!$d || $d['team_id'] != $s['team_id']) { json_out(array('error' => 'forbidden'), 403); }
+        }
+        $enum = array(
+            'comm_status' => array('good','weak','lost'),
+            'gps_status'  => array('fixed','searching','none'),
+            'status'      => array('available','in_use','maintenance','down'),
+        );
+        $sets = array(); $vals = array();
+        foreach (array('model','max_flight_min','battery_count','range_km','battery_pct','comm_status','gps_status','status') as $f) {
+            if (!array_key_exists($f, $b)) { continue; }
+            if (isset($enum[$f]) && !in_array($b[$f], $enum[$f], true)) { continue; }
+            $sets[] = "$f = ?"; $vals[] = $b[$f];
+        }
+        if (!$sets) { json_out(array('error' => 'no_fields'), 400); }
+        $vals[] = $id;
+        $pdo->prepare("UPDATE iuccs_drones SET " . implode(', ', $sets) . " WHERE id = ?")->execute($vals);
+        log_activity('team#' . pval($s, 'team_id', '?'), 'drone_update', 'drone', $id, null);
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/drones/create' && $method === 'POST') {
+        $s    = Auth::require_auth();
+        $b    = body_json();
+        $team = ($s['role'] === 'admin') ? pval($b, 'team_id', $s['team_id']) : $s['team_id'];
+        $code = trim(pval($b, 'code', ''));
+        if ($code === '') { json_out(array('error' => 'code_required'), 400); }
+        try {
+            $st = $pdo->prepare(
+                "INSERT INTO iuccs_drones(team_id, code, model, max_flight_min, battery_count, range_km, battery_pct, comm_status, gps_status, status)
+                 VALUES (?,?,?,?,?,?,?,'good','fixed','available')"
+            );
+            $st->execute(array($team, $code, pval($b, 'model'), pval($b, 'max_flight_min'),
+                pval($b, 'battery_count'), pval($b, 'range_km'), pval($b, 'battery_pct', 100)));
+        } catch (Exception $e) {
+            json_out(array('error' => 'duplicate_or_invalid'), 400);
+        }
+        json_out(array('id' => $pdo->lastInsertId()), 201);
+    }
+
+    if ($path === '/api/missions/board') {
+        Auth::require_auth();
+        $missions = $pdo->query("SELECT * FROM iuccs_missions ORDER BY issued_at DESC LIMIT 100")->fetchAll();
+        $reps = $pdo->query(
+            "SELECT id, mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles,
+                    armed, unarmed, kia, serious, minor, failed, acknowledged, created_at
+               FROM iuccs_reports WHERE mission_id IS NOT NULL ORDER BY created_at DESC"
+        )->fetchAll();
+        $byM = array();
+        foreach ($reps as $r) {
+            $mid = $r['mission_id'];
+            if (!isset($byM[$mid])) { $byM[$mid] = array(); }
+            $byM[$mid][] = $r;
+        }
+        foreach ($missions as $i => $m) {
+            $missions[$i]['reports'] = isset($byM[$m['id']]) ? $byM[$m['id']] : array();
+        }
+        json_out(array('missions' => $missions));
+    }
+
     if ($path === '/api/missions' && $method === 'GET') {
         $s   = Auth::require_auth();
         $tid = pval($_GET, 'team_id', $s['team_id']);

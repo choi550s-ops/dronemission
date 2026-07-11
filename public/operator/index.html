@@ -40,10 +40,10 @@
   .seg button.on{background:var(--navy);color:#fff}
   .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;height:64px;
     border-top:1px solid var(--line);background:#0c182a;display:flex}
-  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
-    color:var(--muted);font-size:10.5px;font-weight:700;border:none;background:none;cursor:pointer;font-family:inherit}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    color:var(--muted);font-size:9.5px;font-weight:700;border:none;background:none;cursor:pointer;font-family:inherit;padding:0 2px}
   .tab.on{color:var(--amber)}
-  .tab .ic{font-size:19px}
+  .tab .ic{font-size:17px}
   h2{color:var(--ink);font-size:16px;margin:2px 0 2px}
   .muted{color:var(--muted)}
   .toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);background:#16324b;border:1px solid var(--steel);
@@ -74,6 +74,7 @@
 </style>
 <link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
 <script src="../vendor/leaflet/leaflet.js"></script>
+<script src="../vendor/mgrs/mgrs.min.js"></script>
 </head>
 <body>
 
@@ -103,11 +104,14 @@
     <span class="modeb" id="rb_mode">실제</span>
     <span class="chip" id="rb_role" style="background:rgba(59,130,214,.18);color:#8fc0ff">운용자</span>
     <span class="clk mono" id="rb_clk">--:--:--</span>
+    <button id="logoutbtn" onclick="doLogout()" title="로그아웃"
+      style="background:none;border:none;color:var(--muted);font-size:17px;padding:2px 0 2px 4px;cursor:pointer;line-height:1">⏻</button>
   </div>
   <main id="view"></main>
   <nav class="tabs" id="tabs">
     <button class="tab on" data-v="home"><span class="ic">🏠</span>홈</button>
     <button class="tab" data-v="missions"><span class="ic">🎯</span>임무</button>
+    <button class="tab" data-v="drones"><span class="ic">✈️</span>기체</button>
     <button class="tab" data-v="report"><span class="ic">📋</span>보고</button>
     <button class="tab" data-v="fire"><span class="ic">📡</span>화력</button>
     <button class="tab" data-v="alerts"><span class="ic">🔔</span>알림</button>
@@ -132,6 +136,13 @@ async function api(path, method='GET', body=null){
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),1900);}
 const esc=s=>String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+function toMGRS(lat,lng){
+  if(lat==null||lng==null||lat===''||lng===''||isNaN(+lat)||isNaN(+lng)) return null;
+  try{ const s=mgrs.forward([+lng,+lat],5); const mt=s.match(/^(\d{1,2}[C-X])([A-Z]{2})(\d+)$/);
+    if(mt){ const dd=mt[3], h=dd.length/2; return mt[1]+' '+mt[2]+' '+dd.slice(0,h)+' '+dd.slice(h); } return s;
+  }catch(e){ return null; }
+}
+function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
 const COMM={good:'양호',weak:'미약',lost:'두절'}, GPS={fixed:'고정',searching:'탐색',none:'없음'};
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
 const FSTAT={received:'접수',reviewing:'검토',approved:'승인',held:'보류',executed:'시행',rejected:'반려'};
@@ -169,7 +180,16 @@ function startClock(){setInterval(()=>{const n=new Date();
 document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('on'));
   t.classList.add('on'); go(t.dataset.v);});
-function go(v){({home:renderHome,missions:renderMissions,report:renderReport,fire:renderFire,alerts:renderAlerts}[v])();}
+function go(v){({home:renderHome,missions:renderMissions,drones:renderDrones,report:renderReport,fire:renderFire,alerts:renderAlerts}[v])();}
+function doLogout(){
+  if(!confirm('로그아웃 하시겠습니까?')) return;
+  api('/logout','POST').catch(()=>{});
+  sessionStorage.removeItem('iuccs_token'); sessionStorage.removeItem('iuccs_sess');
+  TOKEN=null; SESS={};
+  document.getElementById('app').style.display='none';
+  document.getElementById('login').style.display='flex';
+  document.getElementById('in_pw').value='';
+}
 
 // ---- MAP helpers ----
 const TILE='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
@@ -217,12 +237,14 @@ async function renderHome(){
     let cards=drones.map(dr=>{
       const bp=dr.battery_pct??'-';
       const bc=bp>=50?'var(--green)':(bp>=20?'var(--yellow)':'var(--red)');
+      const cc=dr.comm_status==='good'?'var(--green)':(dr.comm_status==='weak'?'var(--yellow)':'var(--red)');
+      const gc=dr.gps_status==='fixed'?'var(--green)':(dr.gps_status==='searching'?'var(--yellow)':'var(--red)');
       return `<div class="card">
         <div class="between" style="margin-bottom:9px"><div class="row">✈️ <span class="val">기체 ${esc(dr.code)}</span></div>
-          <span class="chip" style="background:rgba(47,163,90,.16);color:#6fe0a0">${esc(dr.status)}</span></div>
+          <span class="chip" style="background:rgba(47,163,90,.16);color:#6fe0a0">${STATLBL[dr.status]||esc(dr.status)}</span></div>
         <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot(bc)}배터리</span><span class="val mono">${bp}%</span></div>
-        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot('var(--green)')}통신</span><span class="val">${COMM[dr.comm_status]||dr.comm_status}</span></div>
-        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot('var(--green)')}GPS</span><span class="val">${GPS[dr.gps_status]||dr.gps_status}</span></div>
+        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot(cc)}통신</span><span class="val">${COMM[dr.comm_status]||dr.comm_status}</span></div>
+        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot(gc)}GPS</span><span class="val">${GPS[dr.gps_status]||dr.gps_status}</span></div>
         <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot('var(--yellow)')}최대 비행</span><span class="val mono">${dr.max_flight_min??'-'}분</span></div>
       </div>`;}).join('');
     if(!drones.length) cards='<div class="card muted">배정된 기체가 없습니다.</div>';
@@ -232,6 +254,72 @@ async function renderHome(){
       <div id="home_map" class="minimap"></div>${cards}`;
     homeMap();
   }catch(e){ v.innerHTML=err(e); }
+}
+
+// ---- DRONES (기체 현황 관리) ----
+const STATLBL={available:'가용',in_use:'임무중',maintenance:'정비중',down:'고장'};
+async function renderDrones(){
+  const v=document.getElementById('view');
+  v.innerHTML='<div class="muted">불러오는 중…</div>';
+  try{
+    const d=await api('/drones?team_id='+(SESS.team_id||''));
+    const drones=d.drones||[];
+    v.innerHTML = `<h2>기체 현황 관리</h2>
+      <div id="dronelist" style="display:flex;flex-direction:column;gap:10px">${drones.length?'':'<div class="card muted">배정된 기체가 없습니다.</div>'}</div>
+      <div class="card" style="margin-top:4px">
+        <div class="lbl">신규 기체 등록</div>
+        <input id="nd_code" placeholder="기체 코드 (예: D-09)" style="margin-bottom:8px">
+        <input id="nd_model" placeholder="모델명 (선택)" style="margin-bottom:8px">
+        <button class="btn btn-ghost" style="padding:10px" onclick="createDrone()">+ 기체 추가</button>
+      </div>`;
+    const list=document.getElementById('dronelist');
+    list.innerHTML = drones.map(function(dr){ return droneCard(dr); }).join('');
+  }catch(e){ v.innerHTML=err(e); }
+}
+function droneCard(dr){
+  const bp=dr.battery_pct??0;
+  return `<div class="card" id="dc_${dr.id}">
+    <div class="between" style="margin-bottom:9px"><span class="val">✈️ ${esc(dr.code)}</span>
+      <span class="muted" style="font-size:11.5px">${esc(dr.model||'')}</span></div>
+    <div class="lbl">배터리 (%)</div>
+    <input type="number" min="0" max="100" id="dr_bp_${dr.id}" value="${bp}" style="margin-bottom:9px">
+    <div class="lbl">통신 상태</div>
+    <select id="dr_comm_${dr.id}" style="margin-bottom:9px">
+      <option value="good" ${dr.comm_status==='good'?'selected':''}>양호</option>
+      <option value="weak" ${dr.comm_status==='weak'?'selected':''}>미약</option>
+      <option value="lost" ${dr.comm_status==='lost'?'selected':''}>두절</option>
+    </select>
+    <div class="lbl">GPS 상태</div>
+    <select id="dr_gps_${dr.id}" style="margin-bottom:9px">
+      <option value="fixed" ${dr.gps_status==='fixed'?'selected':''}>고정</option>
+      <option value="searching" ${dr.gps_status==='searching'?'selected':''}>탐색중</option>
+      <option value="none" ${dr.gps_status==='none'?'selected':''}>없음</option>
+    </select>
+    <div class="lbl">운용 상태</div>
+    <select id="dr_stat_${dr.id}" style="margin-bottom:10px">
+      <option value="available" ${dr.status==='available'?'selected':''}>가용</option>
+      <option value="in_use" ${dr.status==='in_use'?'selected':''}>임무중</option>
+      <option value="maintenance" ${dr.status==='maintenance'?'selected':''}>정비중</option>
+      <option value="down" ${dr.status==='down'?'selected':''}>고장</option>
+    </select>
+    <button class="btn btn-amber" style="padding:10px" onclick="saveDrone(${dr.id})">상태 저장</button>
+  </div>`;
+}
+async function saveDrone(id){
+  const g=k=>document.getElementById(k+'_'+id).value;
+  try{
+    await api('/drones/update','POST',{id,battery_pct:+g('dr_bp'),comm_status:g('dr_comm'),gps_status:g('dr_gps'),status:g('dr_stat')});
+    toast('기체 상태 저장됨');
+  }catch(e){ toast('저장 실패'); }
+}
+async function createDrone(){
+  const code=document.getElementById('nd_code').value.trim();
+  const model=document.getElementById('nd_model').value.trim();
+  if(!code){ toast('기체 코드를 입력하세요'); return; }
+  try{
+    await api('/drones/create','POST',{team_id:SESS.team_id,code,model});
+    toast('기체 추가됨'); renderDrones();
+  }catch(e){ toast('추가 실패 (중복 코드일 수 있음)'); }
 }
 
 // ---- MISSIONS ----
@@ -251,12 +339,12 @@ async function renderMissions(){
       const mapBlock=(pts&&pts.length)?`
         <div class="lbl" style="margin:11px 0 0">${atk?'표적 위치':'경로 ('+pts.length+'개 지점)'}</div>
         <div id="mmap_${m.id}" class="pickmap" style="height:180px"></div>
-        <div class="rcoords">${pts.map((p,i)=>'<div>'+(i+1)+') <span class="mono">'+(+p[0]).toFixed(5)+', '+(+p[1]).toFixed(5)+'</span></div>').join('')}</div>`:'';
+        <div class="rcoords">${pts.map((p,i)=>'<div>'+(i+1)+') <span class="mono">'+esc(toMGRS(p[0],p[1])||'')+'</span></div>').join('')}</div>`:'';
       return `<div class="card" ${atk?'style="border-color:rgba(232,163,61,.45)"':''}>
         <div class="between" style="margin-bottom:8px">
           <span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span>
           <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></div>
-        <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">위치</span><span class="mono" style="color:#CFE0F0">${esc(m.coord||'-')}</span></div>
+        <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">위치</span><span class="mono" style="color:#CFE0F0">${esc(coordText(m.lat,m.lng,m.coord))}</span></div>
         <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${atk?'방식':'경로'}</span><span class="val" style="font-size:13px">${esc(atk?(m.method||'표적지정'):(m.route||'-'))}</span></div>
         ${mapBlock}${gate}${ackBtn}</div>`;}).join('');
     Object.keys(routes).forEach(function(id){ mountRouteMap('mmap_'+id, routes[id]); });
@@ -296,7 +384,7 @@ function renderReport(){
   mountPicker('r_map',function(la,ln){
     document.getElementById('r_lat').value=la.toFixed(6);
     document.getElementById('r_lng').value=ln.toFixed(6);
-    document.getElementById('r_geo').innerHTML='위도 <b>'+la.toFixed(5)+'</b> · 경도 <b>'+ln.toFixed(5)+'</b>';
+    document.getElementById('r_geo').innerHTML='<span class="mono">'+(toMGRS(la,ln)||'')+'</span>';
   });
 }
 function numRow(id,label){return `<div class="between" style="padding:7px 0"><span>${label}</span>
@@ -343,7 +431,7 @@ function renderFire(){
   mountPicker('f_map',function(la,ln){
     document.getElementById('f_lat').value=la.toFixed(6);
     document.getElementById('f_lng').value=ln.toFixed(6);
-    document.getElementById('f_geo').innerHTML='위도 <b>'+la.toFixed(5)+'</b> · 경도 <b>'+ln.toFixed(5)+'</b>';
+    document.getElementById('f_geo').innerHTML='<span class="mono">'+(toMGRS(la,ln)||'')+'</span>';
   });
 }
 async function submitFire(){

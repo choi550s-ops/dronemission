@@ -50,6 +50,12 @@
   .mcoords .mono{color:#cfe0f0}
   .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#1a1206;font-weight:800;font-size:11px;padding:0}
   .wp:before,.wp:after{display:none!important}
+  #drawbtn.on-draw{background:linear-gradient(180deg,#E8A33D,#C9871B);color:#1a1206;border-color:transparent}
+  .bcard{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--surface2)}
+  .bcard.attack{border-color:rgba(226,74,59,.4)}
+  .brep{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;font-size:12.5px}
+  .brep-row{display:flex;justify-content:space-between;gap:10px;padding:4px 0}
+  .brep-empty{color:var(--muted);font-size:12px;padding:6px 0}
   .lyr{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);cursor:pointer;user-select:none}
   .lyr.on{background:var(--navy);color:#fff;border-color:var(--steel)}
   .leg{display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:10px}
@@ -93,6 +99,7 @@
 </style>
 <link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
 <script src="../vendor/leaflet/leaflet.js"></script>
+<script src="../vendor/mgrs/mgrs.min.js"></script>
 </head>
 <body>
 
@@ -118,6 +125,7 @@
   <div class="mapcard">
     <div class="maphd">
       <h2 style="margin:0">공통작전상황도 (COP)</h2>
+      <span id="drawhint" style="display:none;margin-left:12px;font-size:12px;font-weight:700;color:#F3C070">● 경로 그리기 중 — 지도를 클릭</span>
       <div style="display:flex;gap:6px;margin-left:auto">
         <span class="lyr on" data-layer="teams" onclick="toggleLayer(this)">팀</span>
         <span class="lyr on" data-layer="reports" onclick="toggleLayer(this)">정찰</span>
@@ -146,14 +154,15 @@
         <h2>임무 지시</h2>
         <div style="display:flex;flex-direction:column;gap:9px">
           <select id="m_team"></select>
-          <select id="m_type" onchange="clearRoute()"><option value="recon">정찰</option><option value="attack">공격</option></select>
-          <input id="m_coord" class="mono" placeholder="WQ 0000 0000 (선택)">
+          <select id="m_type" onchange="onTypeChange()"><option value="recon">정찰</option><option value="attack">공격</option></select>
+          <input id="m_coord" class="mono" placeholder="군사좌표 자동 (지도 지정 시)">
           <input id="m_route" placeholder="비고/방식 (예: 자율 / 표적지정)">
-          <div class="lbl" style="margin-top:2px;letter-spacing:.02em">경로 지정 — 지도를 눌러 경유점 추가</div>
-          <div id="m_map" class="routemap"></div>
-          <div class="mcoords" id="m_coords"><span class="muted">지도를 눌러 경로를 지정하세요</span></div>
-          <button class="btn btn-ghost" style="padding:8px" onclick="clearRoute()">경로 초기화</button>
-          <button class="btn btn-amber" style="padding:11px" onclick="issueMission()">임무 하달</button>
+          <button class="btn btn-ghost" id="drawbtn" style="padding:9px" onclick="toggleDraw()">✎ 지도에서 경로 그리기</button>
+          <div class="mcoords" id="m_coords"><span class="muted">‘경로 그리기’를 켜고 위 COP 지도를 클릭하세요</span></div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" style="padding:9px;flex:1" onclick="clearRoute()">경로 초기화</button>
+            <button class="btn btn-amber" style="padding:11px;flex:2" onclick="issueMission()">임무 하달</button>
+          </div>
           <div class="muted" style="font-size:11.5px">※ 공격 임무는 승인·ROE 확인 후 하달됩니다.</div>
         </div>
       </div>
@@ -164,7 +173,14 @@
     </div>
   </div>
   <div class="card" style="margin-top:16px">
-    <h2>최근 보고</h2>
+    <div class="between" style="margin-bottom:2px">
+      <h2 style="margin:0">임무 지시 현황판</h2>
+      <span class="muted" style="font-size:11.5px">임무별 하달 정보와 수신된 결과 보고를 함께 표시</span>
+    </div>
+    <div id="board" style="display:flex;flex-direction:column;gap:9px;margin-top:10px"></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h2>최근 보고 (전체)</h2>
     <table><thead><tr><th>시각</th><th>팀</th><th>종류</th><th>모드</th><th>내용</th><th></th></tr></thead>
       <tbody id="reports"></tbody></table>
   </div>
@@ -177,6 +193,13 @@ const STATUS={unavailable:['적색·운용불가','var(--red)'],preparing:['황�
   ready:['녹색·준비완료','var(--green)'],on_mission:['청색·임무중','var(--blue)']};
 const FSTAT={received:'접수',reviewing:'검토',approved:'승인',held:'보류',executed:'시행',rejected:'반려'};
 const esc=s=>String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+function toMGRS(lat,lng){
+  if(lat==null||lng==null||lat===''||lng===''||isNaN(+lat)||isNaN(+lng)) return null;
+  try{ const s=mgrs.forward([+lng,+lat],5); const mt=s.match(/^(\d{1,2}[C-X])([A-Z]{2})(\d+)$/);
+    if(mt){ const d=mt[3], h=d.length/2; return mt[1]+' '+mt[2]+' '+d.slice(0,h)+' '+d.slice(h); } return s;
+  }catch(e){ return null; }
+}
+function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
 
 async function api(path,method='GET',body=null){
   const h={'Content-Type':'application/json'}; if(TOKEN)h['Authorization']='Bearer '+TOKEN;
@@ -188,20 +211,47 @@ async function login(){
     const r=await api('/login','POST',{login_id:document.getElementById('l_id').value.trim(),password:document.getElementById('l_pw').value});
     TOKEN=r.token; ROLE=r.role; sessionStorage.setItem('iuccs_dash_token',TOKEN);
     document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='block';
-    startClock(); loadAll(); setInterval(loadAll,10000); initMissionMap();
+    startClock(); loadAll(); setInterval(loadAll,10000);
   }catch(e){ document.getElementById('l_err').style.display='block'; }
 }
 function startClock(){setInterval(()=>document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8),1000);}
 
-async function loadAll(){ await Promise.all([loadDash(),loadFires(),loadReports(),loadMap()]); }
+async function loadAll(){ await Promise.all([loadDash(),loadFires(),loadReports(),loadMap(),loadBoard()]); }
+const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
+async function loadBoard(){
+  try{
+    const d=await api('/missions/board');
+    const ms=(d.missions||[]).slice(0,15);
+    document.getElementById('board').innerHTML = ms.length ? ms.map(function(m){
+      const atk=m.type==='attack';
+      const reps=m.reports||[];
+      const repsHtml = reps.length ? reps.map(function(r){
+        const c = r.kind==='recon' ? `병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}`
+                : `무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}${r.failed==1?' · 실패':''}`;
+        return `<div class="brep-row"><span>${esc(String(r.created_at)).slice(5,16)} · ${esc(coordText(r.lat,r.lng,r.coord))}</span>
+          <span style="text-align:right">${esc(c)} ${r.acknowledged==1?'<span class="muted">(확인)</span>':`<button class="btn btn-ghost" style="padding:3px 9px;font-size:11px" onclick="ackReport(${r.id})">확인</button>`}</span></div>`;
+      }).join('') : '<div class="brep-empty">아직 결과 보고 없음</div>';
+      return `<div class="bcard ${atk?'attack':''}">
+        <div class="between">
+          <span><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span>
+            <span style="margin-left:8px;font-weight:700">${esc(m.team_id)}팀</span>
+            <span class="mono muted" style="margin-left:8px;font-size:12px">${esc(coordText(m.lat,m.lng,m.coord))}</span></span>
+          <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></div>
+        <div class="brep">${repsHtml}</div></div>`;
+    }).join('') : '<div class="muted" style="font-size:12.5px">지시된 임무가 없습니다.</div>';
+  }catch(e){}
+}
 
-let MAP=null, LG={teams:null,reports:null,fires:null}, layerOn={teams:true,reports:true,fires:true};
+let MAP=null, LG={teams:null,reports:null,fires:null,route:null}, layerOn={teams:true,reports:true,fires:true};
 const STATUSCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
 function initMap(){
   if(MAP||typeof L==='undefined') return;
   MAP=L.map('map',{zoomControl:true}).setView([37.555,127.01],13);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(MAP);
   LG.teams=L.layerGroup().addTo(MAP); LG.reports=L.layerGroup().addTo(MAP); LG.fires=L.layerGroup().addTo(MAP);
+  LG.route=L.layerGroup().addTo(MAP);
+  MLINE=L.polyline([],{color:'#E8A33D',weight:3,dashArray:'6,7'}).addTo(LG.route);
+  MAP.on('click',function(e){ if(DRAW) addRoutePoint(e.latlng.lat,e.latlng.lng); });
   setTimeout(function(){ if(MAP) MAP.invalidateSize(); },250);
 }
 function toggleLayer(el){
@@ -217,54 +267,53 @@ async function loadMap(){
     const pts=[];
     (d.teams||[]).forEach(function(t){
       const c=STATUSCOL[t.status]||'#7C90A8';
-      mk(+t.lat,+t.lng,c,9).bindPopup('<b>'+esc(t.team_no)+'팀</b><br>'+(STATUS[t.status]?STATUS[t.status][0]:esc(t.status))+'<br><span style="font-family:monospace">'+esc(t.coord||'')+'</span>').addTo(LG.teams);
+      mk(+t.lat,+t.lng,c,9).bindPopup('<b>'+esc(t.team_no)+'팀</b><br>'+(STATUS[t.status]?STATUS[t.status][0]:esc(t.status))+'<br><span style="font-family:monospace">'+esc(coordText(t.lat,t.lng,t.coord))+'</span>').addTo(LG.teams);
       pts.push([+t.lat,+t.lng]);
     });
     (d.reports||[]).forEach(function(r){
-      mk(+r.lat,+r.lng,'#E8A33D',6).bindPopup('<b>정찰 보고</b> ('+esc(r.team_id)+'팀)<br>병력 '+(r.troops||0)+' · 트럭 '+(r.trucks||0)+'<br><span style="font-family:monospace">'+esc(r.coord||'')+'</span>').addTo(LG.reports);
+      mk(+r.lat,+r.lng,'#E8A33D',6).bindPopup('<b>정찰 보고</b> ('+esc(r.team_id)+'팀)<br>병력 '+(r.troops||0)+' · 트럭 '+(r.trucks||0)+'<br><span style="font-family:monospace">'+esc(coordText(r.lat,r.lng,r.coord))+'</span>').addTo(LG.reports);
       pts.push([+r.lat,+r.lng]);
     });
     (d.fire_requests||[]).forEach(function(f){
-      mk(+f.lat,+f.lng,'#ff5b5b',7).bindPopup('<b>🔺 화력요청</b><br>'+esc(f.target||'')+' · '+(FSTAT[f.status]||f.status)+'<br><span style="font-family:monospace">'+esc(f.coord||'')+'</span>').addTo(LG.fires);
+      mk(+f.lat,+f.lng,'#ff5b5b',7).bindPopup('<b>🔺 화력요청</b><br>'+esc(f.target||'')+' · '+(FSTAT[f.status]||f.status)+'<br><span style="font-family:monospace">'+esc(coordText(f.lat,f.lng,f.coord))+'</span>').addTo(LG.fires);
       pts.push([+f.lat,+f.lng]);
     });
     if(pts.length){ try{ MAP.fitBounds(pts,{padding:[40,40],maxZoom:15}); }catch(e){} }
   }catch(e){}
 }
 
-// ---- mission route drawer ----
-let ROUTE=[], MMAP=null, MLINE=null, MMARK=[];
-function initMissionMap(){
-  if(MMAP||typeof L==='undefined'||!document.getElementById('m_map'))return;
-  MMAP=L.map('m_map',{zoomControl:true}).setView([37.555,127.01],13);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'&copy; OSM &copy; CARTO'}).addTo(MMAP);
-  MLINE=L.polyline([],{color:'#E8A33D',weight:3,dashArray:'6,7'}).addTo(MMAP);
-  MMAP.on('click',function(e){ addRoutePoint(e.latlng.lat,e.latlng.lng); });
-  setTimeout(function(){ if(MMAP) MMAP.invalidateSize(); },250);
+// ---- mission route drawing (on the main COP map) ----
+let ROUTE=[], MLINE=null, MMARK=[], DRAW=false;
+function toggleDraw(){
+  DRAW=!DRAW;
+  document.getElementById('drawbtn').classList.toggle('on-draw',DRAW);
+  document.getElementById('drawbtn').innerHTML = DRAW ? '■ 경로 그리기 중지' : '✎ 지도에서 경로 그리기';
+  document.getElementById('drawhint').style.display = DRAW ? 'inline' : 'none';
+  if(DRAW && MAP){ try{ MAP.scrollIntoView&&MAP.scrollIntoView(); }catch(e){} }
 }
+function onTypeChange(){ clearRoute(); }
 function addRoutePoint(lat,lng){
   const type=document.getElementById('m_type').value;
   if(type==='attack'){ ROUTE=[[lat,lng]]; } else { ROUTE.push([lat,lng]); }
   redrawRoute();
 }
 function redrawRoute(){
-  if(!MMAP)return;
-  MMARK.forEach(function(m){MMAP.removeLayer(m);}); MMARK=[];
+  if(!MAP)return;
+  MMARK.forEach(function(m){LG.route.removeLayer(m);}); MMARK=[];
   ROUTE.forEach(function(p,i){
     const m=L.circleMarker(p,{radius:9,color:'#0b1626',weight:2,fillColor:'#E8A33D',fillOpacity:.95})
-      .bindTooltip(String(i+1),{permanent:true,direction:'center',className:'wp'}).addTo(MMAP);
-    MMARK.push(m);
+      .bindTooltip(String(i+1),{permanent:true,direction:'center',className:'wp'});
+    LG.route.addLayer(m); MMARK.push(m);
   });
   MLINE.setLatLngs(ROUTE);
   const el=document.getElementById('m_coords');
-  el.innerHTML = ROUTE.length ? ROUTE.map(function(p,i){return '<div>'+(i+1)+') <span class="mono">'+p[0].toFixed(5)+', '+p[1].toFixed(5)+'</span></div>';}).join('')
-    : '<span class="muted">지도를 눌러 경로를 지정하세요</span>';
+  el.innerHTML = ROUTE.length ? ROUTE.map(function(p,i){return '<div>'+(i+1)+') <span class="mono">'+esc(toMGRS(p[0],p[1])||'')+'</span></div>';}).join('')
+    : '<span class="muted">‘경로 그리기’를 켜고 위 COP 지도를 클릭하세요</span>';
 }
 function clearRoute(){
-  if(MMAP){ MMARK.forEach(function(m){MMAP.removeLayer(m);}); }
-  MMARK=[]; ROUTE=[];
+  MMARK.forEach(function(m){ if(LG.route) LG.route.removeLayer(m); }); MMARK=[]; ROUTE=[];
   if(MLINE) MLINE.setLatLngs([]);
-  const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">지도를 눌러 경로를 지정하세요</span>';
+  const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">‘경로 그리기’를 켜고 위 COP 지도를 클릭하세요</span>';
 }
 
 async function loadDash(){
@@ -278,7 +327,7 @@ async function loadDash(){
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
       return `<tr><td class="mono" data-label="팀">${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
-        <td class="mono" data-label="좌표">${esc(t.coord||'-')}</td><td data-label="기체">${t.drone_count}</td>
+        <td class="mono" data-label="좌표">${esc(coordText(t.lat,t.lng,t.coord))}</td><td data-label="기체">${t.drone_count}</td>
         <td class="muted mono" data-label="최근 접속" style="font-size:11px">${t.last_login_at?esc(t.last_login_at).slice(5,16):'-'}</td></tr>`;}).join('');
     const sel=document.getElementById('m_team');
     if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; }
@@ -320,17 +369,18 @@ async function issueMission(){
     coord:document.getElementById('m_coord').value,route:document.getElementById('m_route').value};
   if(body.type==='attack'){ body.method='designated'; }
   if(ROUTE.length){ body.route_points=ROUTE; body.lat=ROUTE[0][0]; body.lng=ROUTE[0][1];
-    if(!body.coord){ body.coord=ROUTE[0][0].toFixed(5)+', '+ROUTE[0][1].toFixed(5); } }
+    if(!body.coord){ body.coord=toMGRS(ROUTE[0][0],ROUTE[0][1])||''; } }
   try{ const r=await api('/missions','POST',body);
     alert(r.status==='pending_approval'?'공격 임무 생성됨 — 승인·ROE 확인 대기':'임무 하달됨 (경로 '+ROUTE.length+'개 지점)');
     clearRoute(); document.getElementById('m_coord').value=''; document.getElementById('m_route').value='';
-    loadDash(); loadMap();
+    if(DRAW) toggleDraw();
+    loadDash(); loadMap(); loadBoard();
   }catch(e){ alert(e.error==='forbidden'?'권한이 없습니다 (관리자/팀장).':'하달 실패'); }
 }
 function logout(){ sessionStorage.removeItem('iuccs_dash_token'); location.reload(); }
 
 // auto-enter if token present
-if(TOKEN){ document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='block'; startClock(); loadAll(); setInterval(loadAll,10000); initMissionMap(); }
+if(TOKEN){ document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='block'; startClock(); loadAll(); setInterval(loadAll,10000); }
 </script>
 </body>
 </html>
