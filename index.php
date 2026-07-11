@@ -93,7 +93,7 @@ function route($path, $method)
                FROM iuccs_teams WHERE lat IS NOT NULL ORDER BY team_no"
         )->fetchAll();
         $reports = $pdo->query(
-            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, hostile, note, created_at
+            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, hostile, action_taken, note, created_at
                FROM iuccs_reports WHERE lat IS NOT NULL ORDER BY created_at DESC LIMIT 50"
         )->fetchAll();
         $fires = $pdo->query(
@@ -250,6 +250,22 @@ function route($path, $method)
         log_activity('team#' . pval($s, 'team_id', '?'), 'mission_respond', 'mission', $id, $resp . ($reason ? (':' . $reason) : ''));
         json_out(array('ok' => true));
     }
+    if ($path === '/api/missions/complete' && $method === 'POST') {
+        $s  = Auth::require_auth();
+        $b  = body_json();
+        $id = pval($b, 'id');
+        if ($s['role'] !== 'admin') {
+            $chk = $pdo->prepare("SELECT team_id FROM iuccs_missions WHERE id = ?");
+            $chk->execute(array($id));
+            $row = $chk->fetch();
+            if (!$row || $row['team_id'] != $s['team_id']) { json_out(array('error' => 'forbidden'), 403); }
+        }
+        $note = pval($b, 'note');
+        $pdo->prepare("UPDATE iuccs_missions SET status = 'completed', completion_note = ?, completed_at = NOW() WHERE id = ?")
+            ->execute(array($note, $id));
+        log_activity('team#' . pval($s, 'team_id', '?'), 'mission_complete', 'mission', $id, $note);
+        json_out(array('ok' => true));
+    }
     if ($path === '/api/missions/approve' && $method === 'POST') {
         $s = Auth::require_auth(array('admin'));
         $b = body_json();
@@ -295,6 +311,25 @@ function route($path, $method)
         Auth::require_auth(array('admin', 'leader', 'fire_coord'));
         $b = body_json();
         $pdo->prepare("UPDATE iuccs_reports SET acknowledged = 1 WHERE id = ?")->execute(array(pval($b, 'id', 0)));
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/reports/action' && $method === 'POST') {
+        $s      = Auth::require_auth(array('admin'));
+        $b      = body_json();
+        $id     = pval($b, 'id');
+        $action = pval($b, 'action', '');
+        if ($action === 'reset') {
+            $pdo->prepare("UPDATE iuccs_reports SET action_taken = 'none', action_at = NULL, acknowledged = 0 WHERE id = ?")
+                ->execute(array($id));
+            log_activity('user#' . $s['user_id'], 'report_action_reset', 'report', $id, null);
+            json_out(array('ok' => true));
+        }
+        if (!in_array($action, array('attack', 'hold', 'friendly', 'ack'), true)) {
+            json_out(array('error' => 'invalid_action'), 400);
+        }
+        $pdo->prepare("UPDATE iuccs_reports SET action_taken = ?, action_at = NOW(), acknowledged = 1 WHERE id = ?")
+            ->execute(array($action, $id));
+        log_activity('user#' . $s['user_id'], 'report_action', 'report', $id, $action);
         json_out(array('ok' => true));
     }
 

@@ -70,6 +70,10 @@
   .teamlabel:before{display:none!important}
   .diamond-icon{background:transparent!important;border:none!important}
   .diamond{width:12px;height:12px;background:#E24A3B;border:2px solid #0b1626;transform:rotate(45deg);box-shadow:0 0 4px rgba(226,74,59,.7)}
+  @keyframes hostileBlink{0%,100%{opacity:1}50%{opacity:.32}}
+  .diamond.blinking{animation:hostileBlink 1.1s ease-in-out infinite}
+  .friendly-icon{background:transparent!important;border:none!important}
+  .friendly-square{width:11px;height:11px;background:#2FA35A;border:2px solid #0b1626;box-shadow:0 0 4px rgba(47,163,90,.6)}
   .leaflet-tooltip{background:#16273f;color:#dce8f5;border:1px solid #2e5a88;font-size:11.5px}
   .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#16273f;color:#dce8f5;border:1px solid #2e5a88}
   .leaflet-popup-content{font-size:12px;margin:8px 10px;line-height:1.5}
@@ -215,7 +219,8 @@ function mountPicker(elId,onSet){
   setTimeout(function(){map.invalidateSize();},250);
   return map;
 }
-function diamondIcon(){ return L.divIcon({className:'diamond-icon',html:'<div class="diamond"></div>',iconSize:[13,13],iconAnchor:[6,6]}); }
+function diamondIcon(blink){ return L.divIcon({className:'diamond-icon',html:'<div class="diamond'+(blink?' blinking':'')+'"></div>',iconSize:[13,13],iconAnchor:[6,6]}); }
+function friendlySquareIcon(){ return L.divIcon({className:'friendly-icon',html:'<div class="friendly-square"></div>',iconSize:[11,11],iconAnchor:[5,5]}); }
 async function homeMap(){
   if(typeof L==='undefined'||!document.getElementById('home_map'))return;
   const map=L.map('home_map',{zoomControl:false,attributionControl:false}).setView([37.555,127.01],12);
@@ -234,10 +239,18 @@ async function homeMap(){
     (d.reports||[]).forEach(function(r){
       const teamNo=teamNoOf[r.team_id]||r.team_id;
       const info = r.kind==='recon' ? `병력 ${r.troops||0} · 트럭 ${r.trucks||0} · 차량 ${r.vehicles||0}` : (r.note||'');
-      const tip='<b>'+esc(teamNo)+'팀 보고</b>'+(r.hostile==1?' · <span style="color:#ff8579">🔺적 식별</span>':'')+'<br>'+esc(info);
-      let m;
-      if(r.hostile==1){ m=L.marker([+r.lat,+r.lng],{icon:diamondIcon()}); }
-      else { m=L.circleMarker([+r.lat,+r.lng],{radius:5,weight:2,color:'#0b1626',fillColor:'#E8A33D',fillOpacity:.95}); }
+      const at=r.action_taken||'none';
+      let m, tip;
+      if(r.hostile==1 && at==='friendly'){
+        m=L.marker([+r.lat,+r.lng],{icon:friendlySquareIcon()});
+        tip='<b>'+esc(teamNo)+'팀 보고</b> · <span style="color:#6fe0a0">■ 아군 확인</span><br>'+esc(info);
+      } else if(r.hostile==1){
+        m=L.marker([+r.lat,+r.lng],{icon:diamondIcon(at==='none')});
+        tip='<b>'+esc(teamNo)+'팀 보고</b> · <span style="color:#ff8579">🔺적 식별</span><br>'+esc(info);
+      } else {
+        m=L.circleMarker([+r.lat,+r.lng],{radius:5,weight:2,color:'#0b1626',fillColor:'#E8A33D',fillOpacity:.95});
+        tip='<b>'+esc(teamNo)+'팀 보고</b><br>'+esc(info);
+      }
       m.bindTooltip(tip,{direction:'top',sticky:true}).addTo(map);
       pts.push([+r.lat,+r.lng]);
     });
@@ -348,6 +361,33 @@ async function createDrone(){
 }
 
 // ---- MISSIONS ----
+function completeWidget(m){
+  if(m.status==='completed') return `<div class="geo" style="margin-top:9px;color:#6fe0a0">✔ 임무 완료 보고됨${m.completion_note?' — '+esc(m.completion_note):''}</div>`;
+  if(m.status==='cancelled') return '';
+  return `
+    <div id="cbtn_${m.id}" style="margin-top:9px">
+      <button class="btn btn-ghost" style="padding:9px;font-size:12.5px" onclick="showCompleteForm(${m.id})">✅ 임무 완료 보고</button>
+    </div>
+    <div id="cform_${m.id}" style="display:none;margin-top:9px">
+      <input id="cf_note_${m.id}" placeholder="완료 내용 (선택)" style="margin-bottom:7px">
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost" style="padding:9px;font-size:12px;flex:1" onclick="cancelCompleteForm(${m.id})">취소</button>
+        <button class="btn btn-amber" style="padding:9px;font-size:12px;flex:1" onclick="completeMission(${m.id})">완료 전송</button>
+      </div>
+    </div>`;
+}
+function showCompleteForm(id){
+  const b=document.getElementById('cbtn_'+id); if(b) b.style.display='none';
+  const f=document.getElementById('cform_'+id); if(f) f.style.display='block';
+}
+function cancelCompleteForm(id){
+  const b=document.getElementById('cbtn_'+id); if(b) b.style.display='block';
+  const f=document.getElementById('cform_'+id); if(f) f.style.display='none';
+}
+async function completeMission(id){
+  const e=document.getElementById('cf_note_'+id);
+  try{ await api('/missions/complete','POST',{id,note:e?e.value:''}); toast('임무 완료 보고됨'); renderMissions(); }catch(err){ toast('전송 실패'); }
+}
 function respWidget(m){
   const t=m.response_type;
   if(t==='ack') return `<div class="geo" style="margin-top:9px"><span class="mono" style="color:#6fe0a0">✔ 수신확인 완료</span></div>`;
@@ -405,17 +445,24 @@ async function renderMissions(){
       if(pts&&pts.length) routes[m.id]=pts;
       const gate=atk&&!(m.approved==1)?`<div class="warn" style="margin:9px 0">⚠ 지휘관 승인·교전규칙(ROE) 확인 후 수행 가능</div>`:'';
       const respBlock=respWidget(m);
+      const completeBlock=completeWidget(m);
+      const statusChip = m.status==='completed'
+        ? '<span class="chip" style="background:rgba(47,163,90,.16);color:#6fe0a0">✔ 임무완료</span>'
+        : (m.status==='cancelled'
+          ? '<span class="chip" style="background:rgba(124,144,168,.16);color:var(--muted)">취소됨</span>'
+          : `<span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span>`);
       const mapBlock=(pts&&pts.length)?`
         <div class="lbl" style="margin:11px 0 0">${atk?'표적 위치':'경로 ('+pts.length+'개 지점)'}</div>
         <div id="mmap_${m.id}" class="pickmap" style="height:180px"></div>
         <div class="rcoords">${pts.map((p,i)=>'<div>'+(i+1)+') <span class="mono">'+esc(toMGRS(p[0],p[1])||'')+'</span></div>').join('')}</div>`:'';
-      return `<div class="card" ${atk?'style="border-color:rgba(232,163,61,.45)"':''}>
+      const cardStyle = (atk?'border-color:rgba(232,163,61,.45);':'') + (m.status==='completed'?'opacity:.7;':'');
+      return `<div class="card" ${cardStyle?`style="${cardStyle}"`:''}>
         <div class="between" style="margin-bottom:8px">
           <span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span>
-          <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></div>
+          ${statusChip}</div>
         <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">위치</span><span class="mono" style="color:#CFE0F0">${esc(coordText(m.lat,m.lng,m.coord))}</span></div>
         <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${atk?'방식':'경로'}</span><span class="val" style="font-size:13px">${esc(atk?(m.method||'표적지정'):(m.route||'-'))}</span></div>
-        ${mapBlock}${gate}${respBlock}</div>`;}).join('');
+        ${mapBlock}${gate}${respBlock}${completeBlock}</div>`;}).join('');
     Object.keys(routes).forEach(function(id){ mountRouteMap('mmap_'+id, routes[id]); });
   }catch(e){ v.innerHTML=err(e); }
 }
