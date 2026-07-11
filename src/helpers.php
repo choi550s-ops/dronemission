@@ -13,17 +13,21 @@ function body_json()
 {
     $raw = file_get_contents('php://input');
     $d = json_decode($raw, true);
-    return is_array($d) ? $d : [];
+    return is_array($d) ? $d : array();
 }
 
 function bearer_token()
 {
-    $h = $_SERVER['HTTP_AUTHORIZATION']
-        ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
+    $h = '';
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $h = $_SERVER['HTTP_AUTHORIZATION'];
+    } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $h = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
     if ($h && preg_match('/Bearer\s+(\S+)/i', $h, $m)) {
         return $m[1];
     }
-    return $_SERVER['HTTP_X_TOKEN'] ?? '';
+    return isset($_SERVER['HTTP_X_TOKEN']) ? $_SERVER['HTTP_X_TOKEN'] : '';
 }
 
 function log_activity($actor, $action, $entity = null, $entityId = null, $detail = null)
@@ -32,8 +36,8 @@ function log_activity($actor, $action, $entity = null, $entityId = null, $detail
         $st = Database::pdo()->prepare(
             "INSERT INTO activity_log(actor, action, entity, entity_id, detail) VALUES (?,?,?,?,?)"
         );
-        $st->execute([$actor, $action, $entity, $entityId, $detail]);
-    } catch (Throwable $e) {
+        $st->execute(array($actor, $action, $entity, $entityId, $detail));
+    } catch (Exception $e) {
         // logging must never break the request
     }
 }

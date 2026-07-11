@@ -5,7 +5,7 @@ try {
     foreach (Migrator::run() as $line) {
         fwrite(STDOUT, "[migrate] $line\n");
     }
-} catch (Throwable $e) {
+} catch (Exception $e) {
     fwrite(STDERR, "[migrate] FAILED: " . $e->getMessage() . "\n");
     exit(1);
 }

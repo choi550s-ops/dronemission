@@ -14,36 +14,35 @@ class Auth
                LEFT JOIN teams t ON t.id = u.team_id
               WHERE u.login_id = ? LIMIT 1"
         );
-        $st->execute([$loginId]);
+        $st->execute(array($loginId));
         $u = $st->fetch();
         if (!$u || !password_verify($password, $u['password_hash'])) {
             return null;
         }
-        $token = bin2hex(random_bytes(32));
+        $token = random_token(32);
         $mode  = ($mode === 'sim') ? 'sim' : 'real';
-        $exp   = (new DateTime('+12 hours'))->format('Y-m-d H:i:s');
+        $exp   = date('Y-m-d H:i:s', time() + 12 * 3600);
         $pdo->prepare(
             "INSERT INTO sessions(token, user_id, team_id, role, mode, expires_at)
              VALUES (?,?,?,?,?,?)"
-        )->execute([$token, $u['id'], $u['team_id'], $u['role'], $mode, $exp]);
+        )->execute(array($token, $u['id'], $u['team_id'], $u['role'], $mode, $exp));
 
         if ($u['team_id']) {
             $pdo->prepare("UPDATE teams SET last_login_at = NOW() WHERE id = ?")
-                ->execute([$u['team_id']]);
+                ->execute(array($u['team_id']));
         }
         log_activity($loginId, 'login', 'user', $u['id'], 'mode=' . $mode);
 
-        return [
+        return array(
             'token'        => $token,
             'role'         => $u['role'],
             'team_id'      => $u['team_id'],
             'team_no'      => $u['team_no'],
             'display_name' => $u['display_name'],
             'mode'         => $mode,
-        ];
+        );
     }
 
-    // Returns the current session row (or null) based on the bearer token.
     public static function current()
     {
         $token = bearer_token();
@@ -53,20 +52,19 @@ class Auth
         $st = Database::pdo()->prepare(
             "SELECT * FROM sessions WHERE token = ? AND expires_at > NOW() LIMIT 1"
         );
-        $st->execute([$token]);
+        $st->execute(array($token));
         $s = $st->fetch();
-        return $s ?: null;
+        return $s ? $s : null;
     }
 
-    // Guard: aborts with 401/403 unless authenticated (and, optionally, in an allowed role).
     public static function require_auth($roles = null)
     {
         $s = self::current();
         if (!$s) {
-            json_out(['error' => 'unauthorized'], 401);
+            json_out(array('error' => 'unauthorized'), 401);
         }
         if ($roles && !in_array($s['role'], $roles, true)) {
-            json_out(['error' => 'forbidden'], 403);
+            json_out(array('error' => 'forbidden'), 403);
         }
         return $s;
     }
@@ -75,7 +73,7 @@ class Auth
     {
         $token = bearer_token();
         if ($token) {
-            Database::pdo()->prepare("DELETE FROM sessions WHERE token = ?")->execute([$token]);
+            Database::pdo()->prepare("DELETE FROM sessions WHERE token = ?")->execute(array($token));
         }
     }
 }

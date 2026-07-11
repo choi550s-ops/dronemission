@@ -1,5 +1,40 @@
 <?php
-// Loads configuration from a .env file (kept out of git) or real environment variables.
+// Config loader + small compatibility polyfills (works on PHP 5.4+).
+
+// ---- compatibility helpers ----
+if (!function_exists('pval')) {
+    // safe array read: pval($arr,'key','default')
+    function pval($arr, $key, $default = null) {
+        return (is_array($arr) && isset($arr[$key])) ? $arr[$key] : $default;
+    }
+}
+if (!function_exists('random_token')) {
+    // hex token, works without random_bytes() (PHP < 7)
+    function random_token($bytes = 32) {
+        if (function_exists('random_bytes')) {
+            return bin2hex(random_bytes($bytes));
+        }
+        if (function_exists('openssl_random_pseudo_bytes')) {
+            $b = openssl_random_pseudo_bytes($bytes);
+            if ($b !== false) { return bin2hex($b); }
+        }
+        $s = '';
+        for ($i = 0; $i < $bytes * 2; $i++) { $s .= dechex(mt_rand(0, 15)); }
+        return $s;
+    }
+}
+if (!function_exists('hash_equals')) {
+    // constant-time compare polyfill (PHP < 5.6)
+    function hash_equals($known, $user) {
+        $known = (string) $known; $user = (string) $user;
+        if (strlen($known) !== strlen($user)) { return false; }
+        $res = 0;
+        for ($i = 0, $n = strlen($known); $i < $n; $i++) {
+            $res |= ord($known[$i]) ^ ord($user[$i]);
+        }
+        return $res === 0;
+    }
+}
 
 function env_load($path)
 {
@@ -7,7 +42,7 @@ function env_load($path)
     if ($loaded !== null) {
         return $loaded;
     }
-    $loaded = [];
+    $loaded = array();
     if (is_file($path)) {
         foreach (file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
             $line = trim($line);
@@ -41,20 +76,20 @@ function config()
         }
         return isset($env[$k]) ? $env[$k] : $d;
     };
-    $c = [
-        'db' => [
+    $c = array(
+        'db' => array(
             'host'    => $get('DB_HOST', 'localhost'),
             'port'    => $get('DB_PORT', '3306'),
             'name'    => $get('DB_NAME', ''),
             'user'    => $get('DB_USER', ''),
             'pass'    => $get('DB_PASS', ''),
             'charset' => 'utf8mb4',
-        ],
-        'app' => [
+        ),
+        'app' => array(
             'name'          => $get('APP_NAME', 'IUCCS'),
             'env'           => $get('APP_ENV', 'production'),
             'init_password' => $get('INIT_PASSWORD', 'changeme1234'),
-        ],
-    ];
+        ),
+    );
     return $c;
 }
