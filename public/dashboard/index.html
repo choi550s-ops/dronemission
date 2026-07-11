@@ -18,7 +18,7 @@
   header .clk{margin-left:auto;font-size:14px;color:#AFC3DA}
   .modeb{font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px}
   .mode-real{background:rgba(226,74,59,.16);color:#FF8579;border:1px solid rgba(226,74,59,.5)}
-  .wrap{max-width:1200px;margin:0 auto;padding:18px 20px 60px}
+  .wrap{max-width:1360px;margin:0 auto;padding:18px 22px 60px}
   .counts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
   .stat{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px 18px}
   .stat .n{font-size:34px;font-weight:800;color:var(--ink)}
@@ -56,7 +56,35 @@
   .leaflet-bar a{background:#16273f;color:#cfe0f0;border-color:#2e5a88}
   .leaflet-control-attribution{background:rgba(11,22,38,.7)!important;color:#6b7a8c!important}
   .leaflet-control-attribution a{color:#8fa4bd!important}
-  @media(max-width:820px){.grid{grid-template-columns:1fr}.counts{grid-template-columns:1fr}#map{height:340px}}
+  #login .box{width:min(340px,92vw)}
+  /* ---------- tablet / phone ---------- */
+  @media(max-width:900px){
+    .wrap{max-width:100%;padding:14px 12px 52px}
+    .grid{grid-template-columns:1fr}
+    .counts{grid-template-columns:repeat(3,1fr);gap:9px}
+    .stat{padding:12px}
+    .stat .n{font-size:26px}
+    .stat .l{font-size:11px}
+    #map{height:330px}
+    header{padding:12px 14px}
+    header .title{font-size:15px}
+    .mapcard,.card{padding:13px}
+    /* tables become stacked cards */
+    table thead{display:none}
+    table,tbody,tr,td{display:block;width:100%}
+    tbody tr{border:1px solid var(--line);border-radius:11px;padding:7px 12px;margin-bottom:9px;background:var(--surface2)}
+    tbody td{border:none;padding:6px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:right;font-size:13px}
+    tbody td::before{content:attr(data-label);color:var(--muted);font-weight:700;font-size:12px;text-align:left;white-space:nowrap}
+    tbody td:empty{display:none}
+  }
+  @media(max-width:480px){
+    header .build{display:none}
+    .counts .stat .n{font-size:21px}
+    .counts .stat .l{font-size:10px}
+    #map{height:270px}
+    .maphd h2{font-size:13px}
+    .lyr{padding:5px 9px;font-size:11px}
+  }
 </style>
 <link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
 <script src="../vendor/leaflet/leaflet.js"></script>
@@ -204,10 +232,10 @@ async function loadDash(){
       <div class="stat"><div class="n">${d.counts.fire_pending}</div><div class="l">화력요청 대기</div></div>`;
     document.getElementById('teams').innerHTML=(d.teams||[]).map(t=>{
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
-      return `<tr><td class="mono">${esc(t.team_no)}팀</td>
-        <td><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
-        <td class="mono">${esc(t.coord||'-')}</td><td>${t.drone_count}</td>
-        <td class="muted mono" style="font-size:11px">${t.last_login_at?esc(t.last_login_at).slice(5,16):'-'}</td></tr>`;}).join('');
+      return `<tr><td class="mono" data-label="팀">${esc(t.team_no)}팀</td>
+        <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
+        <td class="mono" data-label="좌표">${esc(t.coord||'-')}</td><td data-label="기체">${t.drone_count}</td>
+        <td class="muted mono" data-label="최근 접속" style="font-size:11px">${t.last_login_at?esc(t.last_login_at).slice(5,16):'-'}</td></tr>`;}).join('');
     const sel=document.getElementById('m_team');
     if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; }
   }catch(e){ if(e.error==='unauthorized') logout(); }
@@ -233,11 +261,11 @@ async function loadReports(){
     document.getElementById('reports').innerHTML=rs.length?rs.map(r=>{
       let c=r.kind==='recon'?`병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}`
         :`무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}`;
-      return `<tr><td class="muted mono" style="font-size:11px">${esc(String(r.created_at)).slice(5,16)}</td>
-        <td>${esc(r.team_id)}</td><td>${r.kind==='recon'?'정찰':(r.kind==='attack'?'공격':'사진')}</td>
-        <td><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
-        <td style="font-size:12.5px">${esc(c)}</td>
-        <td>${r.acknowledged==1?'<span class="muted">확인</span>':`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`}</td></tr>`;}).join('')
+      return `<tr><td class="muted mono" data-label="시각" style="font-size:11px">${esc(String(r.created_at)).slice(5,16)}</td>
+        <td data-label="팀">${esc(r.team_id)}</td><td data-label="종류">${r.kind==='recon'?'정찰':(r.kind==='attack'?'공격':'사진')}</td>
+        <td data-label="모드"><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
+        <td data-label="내용" style="font-size:12.5px">${esc(c)}</td>
+        <td data-label="처리">${r.acknowledged==1?'<span class="muted">확인</span>':`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`}</td></tr>`;}).join('')
       :'<tr><td colspan="6" class="muted">보고 없음</td></tr>';
   }catch(e){}
 }
