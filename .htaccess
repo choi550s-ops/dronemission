@@ -1,4 +1,4 @@
-# --- IUCCS Apache configuration (shared hosting) ---
+# --- IUCCS Apache configuration (works at web root or in a subfolder) ---
 
 Options -Indexes
 
@@ -9,16 +9,17 @@ Options -Indexes
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
+    # Block direct access to code/config/data directories.
+    # Pattern is relative to this app folder, so it works under /dronemission/ too.
+    RewriteRule ^(config|src|bin|db|\.github)(/|$) - [F,L]
+
     # Serve real files/dirs directly; route everything else to the front controller.
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [L]
 </IfModule>
 
-# Block direct access to sensitive files.
+# Block sensitive files by name (any location).
 <FilesMatch "^\.env$|\.sql$|composer\.(json|lock)$|\.md$|\.gitignore$|\.ya?ml$">
     Require all denied
 </FilesMatch>
-
-# Block direct access to code/config/data directories.
-RedirectMatch 403 ^/?(config|src|bin|db|\.github|\.git)(/|$)

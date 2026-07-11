@@ -43,8 +43,8 @@ PHP + MariaDB 웹 애플리케이션 + **GitHub Actions 자동 FTP 배포**.
 | `FTP_USERNAME` | 호스팅 계정 | |
 | `FTP_PASSWORD` | ******** | |
 | `FTP_PORT` | `21` | (선택, 기본 21) |
-| `FTP_SERVER_DIR` | `/www/` (카페24) · `/html/`(가비아) | **끝에 `/` 필수.** 웹 루트 경로 |
-| `SITE_URL` | `https://mysite.co.kr` | (선택) 배포 후 자동 마이그레이션용 |
+| `FTP_SERVER_DIR` | `/www/dronemission/` (카페24, 하위폴더) | **끝에 `/` 필수.** 파일이 올라갈 폴더 |
+| `SITE_URL` | `http://staff4.cafe24.com/dronemission` | (선택) 배포 후 자동 마이그레이션용 |
 | `MIGRATE_TOKEN` | 긴 무작위 문자열 | (선택) 위와 함께 자동 마이그레이션용 |
 
 > **FTP_SERVER_DIR 값 찾기** — FileZilla로 같은 계정에 접속했을 때 기존 사이트 파일이 있고 실제 서비스되는 폴더가 그 값입니다. 접속하자마자 웹 루트면 `./`, 하위폴더에 넣으려면 `/www/iuccs/` 처럼.
