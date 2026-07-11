@@ -56,6 +56,20 @@
   .warn{background:rgba(232,163,61,.1);border:1px solid rgba(232,163,61,.35);color:#f3c882;
     font-size:12px;line-height:1.4;padding:9px 11px;border-radius:9px}
 </style>
+<style>
+  .pickmap{height:200px;border-radius:11px;border:1px solid var(--line);margin-top:8px;background:#0b1626;z-index:1}
+  .minimap{height:180px;border-radius:12px;border:1px solid var(--line);margin:4px 0 2px;background:#0b1626;z-index:1}
+  .geo{font-size:12px;color:var(--muted);margin-top:8px}
+  .geo b{color:var(--ink);font-family:"SF Mono",monospace}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#16273f;color:#dce8f5;border:1px solid #2e5a88}
+  .leaflet-popup-content{font-size:12px;margin:8px 10px;line-height:1.5}
+  .leaflet-container{font-family:inherit;background:#0b1626}
+  .leaflet-bar a{background:#16273f;color:#cfe0f0;border-color:#2e5a88}
+  .leaflet-control-attribution{background:rgba(11,22,38,.7)!important;color:#6b7a8c!important}
+  .leaflet-control-attribution a{color:#8fa4bd!important}
+</style>
+<link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
+<script src="../vendor/leaflet/leaflet.js"></script>
 </head>
 <body>
 
@@ -153,6 +167,42 @@ document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>{
   t.classList.add('on'); go(t.dataset.v);});
 function go(v){({home:renderHome,missions:renderMissions,report:renderReport,fire:renderFire,alerts:renderAlerts}[v])();}
 
+// ---- MAP helpers ----
+const TILE='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
+function darkTiles(map){L.tileLayer(TILE,{maxZoom:19,subdomains:'abcd',attribution:'&copy; OSM &copy; CARTO'}).addTo(map);}
+function mountPicker(elId,onSet){
+  if(typeof L==='undefined')return null;
+  const map=L.map(elId,{zoomControl:true}).setView([37.555,127.01],13);
+  darkTiles(map); let marker=null;
+  map.on('click',function(e){
+    const la=e.latlng.lat, ln=e.latlng.lng;
+    if(marker)marker.setLatLng([la,ln]); else marker=L.circleMarker([la,ln],{radius:8,color:'#0b1626',weight:2,fillColor:'#E8A33D',fillOpacity:.95}).addTo(map);
+    onSet(la,ln);
+  });
+  setTimeout(function(){map.invalidateSize();},250);
+  return map;
+}
+async function homeMap(){
+  if(typeof L==='undefined'||!document.getElementById('home_map'))return;
+  const map=L.map('home_map',{zoomControl:false,attributionControl:false}).setView([37.555,127.01],12);
+  darkTiles(map);
+  try{
+    const d=await api('/map'); const pts=[];
+    (d.teams||[]).forEach(function(t){
+      const col=TCOL[t.status]||'#7C90A8';
+      L.circleMarker([+t.lat,+t.lng],{radius:8,color:'#0b1626',weight:2,fillColor:col,fillOpacity:.95}).bindPopup(esc(t.team_no)+'팀').addTo(map);
+      pts.push([+t.lat,+t.lng]);
+    });
+    (d.fire_requests||[]).forEach(function(f){
+      L.circleMarker([+f.lat,+f.lng],{radius:6,color:'#0b1626',weight:2,fillColor:'#ff5b5b',fillOpacity:.95}).addTo(map);
+      pts.push([+f.lat,+f.lng]);
+    });
+    if(pts.length)map.fitBounds(pts,{padding:[28,28],maxZoom:14});
+  }catch(e){}
+  setTimeout(function(){map.invalidateSize();},250);
+}
+
 // ---- HOME ----
 async function renderHome(){
   const v=document.getElementById('view');
@@ -173,7 +223,10 @@ async function renderHome(){
       </div>`;}).join('');
     if(!drones.length) cards='<div class="card muted">배정된 기체가 없습니다.</div>';
     v.innerHTML=`<div class="between"><div class="lbl" style="margin:0">내 역할</div>
-      <span class="badge" style="background:var(--navy);color:#cfe0f0">${document.getElementById('rb_role').textContent}</span></div>${cards}`;
+      <span class="badge" style="background:var(--navy);color:#cfe0f0">${document.getElementById('rb_role').textContent}</span></div>
+      <div class="lbl" style="margin:12px 0 0">상황 지도</div>
+      <div id="home_map" class="minimap"></div>${cards}`;
+    homeMap();
   }catch(e){ v.innerHTML=err(e); }
 }
 
@@ -207,11 +260,20 @@ function renderReport(){
     <h2>결과 보고</h2>
     <div class="seg" id="rkind"><button data-k="recon" class="on">정찰</button><button data-k="attack">공격 / 피해</button></div>
     <div class="card"><div class="lbl">식별 위치 (군사좌표)</div><input id="r_coord" class="mono" placeholder="WQ 0000 0000"></div>
+    <div class="card"><div class="lbl">위치 — 지도를 눌러 지정</div>
+      <div id="r_map" class="pickmap"></div>
+      <div class="geo" id="r_geo">아직 지정 안 됨 (지도를 탭하세요)</div>
+      <input type="hidden" id="r_lat"><input type="hidden" id="r_lng"></div>
     <div id="rfields"></div>
     <button class="btn btn-amber" onclick="submitReport()">✔ 보고 전송</button>`;
   document.querySelectorAll('#rkind button').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#rkind button').forEach(x=>x.classList.remove('on'));b.classList.add('on');RKIND=b.dataset.k;rfields();});
   rfields();
+  mountPicker('r_map',function(la,ln){
+    document.getElementById('r_lat').value=la.toFixed(6);
+    document.getElementById('r_lng').value=ln.toFixed(6);
+    document.getElementById('r_geo').innerHTML='위도 <b>'+la.toFixed(5)+'</b> · 경도 <b>'+ln.toFixed(5)+'</b>';
+  });
 }
 function numRow(id,label){return `<div class="between" style="padding:7px 0"><span>${label}</span>
   <input id="${id}" type="number" inputmode="numeric" style="width:90px;text-align:right" value="0"></div>`;}
@@ -229,6 +291,7 @@ function rfields(){
 async function submitReport(){
   const g=id=>{const e=document.getElementById(id);return e?e.value:null;};
   const body={team_id:SESS.team_id,kind:RKIND,mode:MODE,coord:g('r_coord')};
+  const rla=g('r_lat'), rln=g('r_lng'); if(rla){body.lat=+rla;} if(rln){body.lng=+rln;}
   if(RKIND==='recon'){Object.assign(body,{troops:+g('r_troops'),trucks:+g('r_trucks'),vehicles:+g('r_vehicles')});}
   else{Object.assign(body,{armed:+g('r_armed'),unarmed:+g('r_unarmed'),kia:+g('r_kia'),serious:+g('r_serious'),minor:+g('r_minor'),failed:document.getElementById('r_failed').checked?1:0});}
   try{ await api('/reports','POST',body); toast('보고 전송됨'); renderReport(); }catch(e){ toast('전송 실패'); }
@@ -241,6 +304,10 @@ function renderFire(){
   v.innerHTML=`
     <h2>화력협조 요청</h2>
     <div class="card"><div class="lbl">요청 위치 (군사좌표)</div><input id="f_coord" class="mono" placeholder="WQ 0000 0000"></div>
+    <div class="card"><div class="lbl">위치 — 지도를 눌러 지정</div>
+      <div id="f_map" class="pickmap"></div>
+      <div class="geo" id="f_geo">아직 지정 안 됨 (지도를 탭하세요)</div>
+      <input type="hidden" id="f_lat"><input type="hidden" id="f_lng"></div>
     <div class="card"><div class="lbl">표적</div><input id="f_target" placeholder="예: 차량·병력"></div>
     <div class="card"><div class="lbl">규모</div>
       <select id="f_scale"><option value="소">소</option><option value="중" selected>중</option><option value="대">대</option></select></div>
@@ -249,11 +316,17 @@ function renderFire(){
     <button class="btn btn-amber" style="margin-top:4px" onclick="submitFire()">📡 요청 전송</button>`;
   document.querySelectorAll('#fsup button').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#fsup button').forEach(x=>x.classList.remove('on'));b.classList.add('on');FSUP=b.dataset.s;});
+  mountPicker('f_map',function(la,ln){
+    document.getElementById('f_lat').value=la.toFixed(6);
+    document.getElementById('f_lng').value=ln.toFixed(6);
+    document.getElementById('f_geo').innerHTML='위도 <b>'+la.toFixed(5)+'</b> · 경도 <b>'+ln.toFixed(5)+'</b>';
+  });
 }
 async function submitFire(){
   const g=id=>document.getElementById(id).value;
-  try{ await api('/fire-requests','POST',{team_id:SESS.team_id,coord:g('f_coord'),target:g('f_target'),scale:g('f_scale'),support_from:FSUP,mode:MODE});
-    toast('화력요청 전송됨'); }catch(e){ toast('전송 실패'); }
+  const body={team_id:SESS.team_id,coord:g('f_coord'),target:g('f_target'),scale:g('f_scale'),support_from:FSUP,mode:MODE};
+  const fla=g('f_lat'), fln=g('f_lng'); if(fla){body.lat=+fla;} if(fln){body.lng=+fln;}
+  try{ await api('/fire-requests','POST',body); toast('화력요청 전송됨'); }catch(e){ toast('전송 실패'); }
 }
 
 // ---- ALERTS ----

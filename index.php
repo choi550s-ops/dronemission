@@ -68,7 +68,7 @@ function route($path, $method)
     if ($path === '/api/dashboard') {
         Auth::require_auth();
         $teams = $pdo->query(
-            "SELECT t.id, t.team_no, t.name, t.status, t.coord, t.last_login_at,
+            "SELECT t.id, t.team_no, t.name, t.status, t.coord, t.lat, t.lng, t.last_login_at,
                     (SELECT COUNT(*) FROM iuccs_drones d WHERE d.team_id = t.id) AS drone_count
                FROM iuccs_teams t ORDER BY t.team_no"
         )->fetchAll();
@@ -84,6 +84,23 @@ function route($path, $method)
             )->fetchColumn(),
         );
         json_out(array('teams' => $teams, 'counts' => $counts, 'server_time' => date('c')));
+    }
+
+    if ($path === '/api/map') {
+        Auth::require_auth();
+        $teams = $pdo->query(
+            "SELECT id, team_no, name, status, coord, lat, lng
+               FROM iuccs_teams WHERE lat IS NOT NULL ORDER BY team_no"
+        )->fetchAll();
+        $reports = $pdo->query(
+            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, created_at
+               FROM iuccs_reports WHERE lat IS NOT NULL ORDER BY created_at DESC LIMIT 50"
+        )->fetchAll();
+        $fires = $pdo->query(
+            "SELECT id, team_id, coord, target, scale, status, lat, lng, created_at
+               FROM iuccs_fire_requests WHERE lat IS NOT NULL ORDER BY created_at DESC LIMIT 50"
+        )->fetchAll();
+        json_out(array('teams' => $teams, 'reports' => $reports, 'fire_requests' => $fires));
     }
 
     if ($path === '/api/teams') {
@@ -116,12 +133,12 @@ function route($path, $method)
         $status = ($type === 'attack') ? 'pending_approval' : 'issued';
         $mode   = (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real';
         $st = $pdo->prepare(
-            "INSERT INTO iuccs_missions(team_id, type, coord, route, method, mode, status, issued_by)
-             VALUES (?,?,?,?,?,?,?,?)"
+            "INSERT INTO iuccs_missions(team_id, type, coord, lat, lng, route, method, mode, status, issued_by)
+             VALUES (?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
-            pval($b, 'team_id', $s['team_id']), $type, pval($b, 'coord'), pval($b, 'route'),
-            pval($b, 'method'), $mode, $status, $s['user_id'],
+            pval($b, 'team_id', $s['team_id']), $type, pval($b, 'coord'), pval($b, 'lat'), pval($b, 'lng'),
+            pval($b, 'route'), pval($b, 'method'), $mode, $status, $s['user_id'],
         ));
         $id = $pdo->lastInsertId();
         log_activity('user#' . $s['user_id'], 'mission_issue', 'mission', $id, $type);
@@ -158,13 +175,14 @@ function route($path, $method)
         $kind = in_array(pval($b, 'kind', ''), array('recon', 'attack', 'photo'), true) ? $b['kind'] : 'recon';
         $st  = $pdo->prepare(
             "INSERT INTO iuccs_reports
-                (mission_id, team_id, kind, mode, coord, troops, trucks, vehicles,
+                (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles,
                  armed, unarmed, scale, kia, serious, minor, failed, note)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'mission_id'), pval($b, 'team_id', $s['team_id']), $kind,
             (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real', pval($b, 'coord'),
+            pval($b, 'lat'), pval($b, 'lng'),
             pval($b, 'troops'), pval($b, 'trucks'), pval($b, 'vehicles'),
             pval($b, 'armed'), pval($b, 'unarmed'), pval($b, 'scale'),
             pval($b, 'kia'), pval($b, 'serious'), pval($b, 'minor'),
@@ -189,12 +207,13 @@ function route($path, $method)
         $s  = Auth::require_auth();
         $b  = body_json();
         $st = $pdo->prepare(
-            "INSERT INTO iuccs_fire_requests(team_id, coord, target, scale, support_from, mode)
-             VALUES (?,?,?,?,?,?)"
+            "INSERT INTO iuccs_fire_requests(team_id, coord, lat, lng, target, scale, support_from, mode)
+             VALUES (?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
-            pval($b, 'team_id', $s['team_id']), pval($b, 'coord'), pval($b, 'target'),
-            pval($b, 'scale'), (pval($b, 'support_from', 'higher') === 'adjacent') ? 'adjacent' : 'higher',
+            pval($b, 'team_id', $s['team_id']), pval($b, 'coord'), pval($b, 'lat'), pval($b, 'lng'),
+            pval($b, 'target'), pval($b, 'scale'),
+            (pval($b, 'support_from', 'higher') === 'adjacent') ? 'adjacent' : 'higher',
             (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real',
         ));
         $id = $pdo->lastInsertId();

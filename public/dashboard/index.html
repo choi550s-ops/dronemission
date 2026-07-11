@@ -42,8 +42,24 @@
   #login input{padding:12px;font-size:15px}
   #login .lbl{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700;margin-bottom:6px}
   .warn{background:rgba(232,163,61,.1);border:1px solid rgba(232,163,61,.35);color:#f3c882;font-size:12px;padding:9px;border-radius:9px}
-  @media(max-width:820px){.grid{grid-template-columns:1fr}.counts{grid-template-columns:1fr}}
+  .mapcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:18px}
+  .maphd{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  #map{height:440px;border-radius:10px;border:1px solid var(--line);background:#0b1626;z-index:1}
+  .lyr{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);cursor:pointer;user-select:none}
+  .lyr.on{background:var(--navy);color:#fff;border-color:var(--steel)}
+  .leg{display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:10px}
+  .leg span{display:inline-flex;align-items:center;gap:5px}
+  .leg i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#16273f;color:#dce8f5;border:1px solid #2e5a88}
+  .leaflet-popup-content{font-size:12.5px;margin:9px 11px;line-height:1.5}
+  .leaflet-container{font-family:inherit;background:#0b1626}
+  .leaflet-bar a{background:#16273f;color:#cfe0f0;border-color:#2e5a88}
+  .leaflet-control-attribution{background:rgba(11,22,38,.7)!important;color:#6b7a8c!important}
+  .leaflet-control-attribution a{color:#8fa4bd!important}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}.counts{grid-template-columns:1fr}#map{height:340px}}
 </style>
+<link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
+<script src="../vendor/leaflet/leaflet.js"></script>
 </head>
 <body>
 
@@ -65,6 +81,27 @@
 
 <div class="wrap" id="wrap" style="display:none">
   <div class="counts" id="counts"></div>
+
+  <div class="mapcard">
+    <div class="maphd">
+      <h2 style="margin:0">공통작전상황도 (COP)</h2>
+      <div style="display:flex;gap:6px;margin-left:auto">
+        <span class="lyr on" data-layer="teams" onclick="toggleLayer(this)">팀</span>
+        <span class="lyr on" data-layer="reports" onclick="toggleLayer(this)">정찰</span>
+        <span class="lyr on" data-layer="fires" onclick="toggleLayer(this)">화력요청</span>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="leg">
+      <span><i style="background:#E24A3B"></i>운용불가</span>
+      <span><i style="background:#E1A800"></i>준비중</span>
+      <span><i style="background:#2FA35A"></i>준비완료</span>
+      <span><i style="background:#3B82D6"></i>임무중</span>
+      <span><i style="background:#E8A33D"></i>정찰 결과</span>
+      <span><i style="background:#ff5b5b"></i>화력요청</span>
+    </div>
+  </div>
+
   <div class="grid">
     <div class="card">
       <h2>팀 · 자산 현황</h2>
@@ -119,7 +156,44 @@ async function login(){
 }
 function startClock(){setInterval(()=>document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8),1000);}
 
-async function loadAll(){ await Promise.all([loadDash(),loadFires(),loadReports()]); }
+async function loadAll(){ await Promise.all([loadDash(),loadFires(),loadReports(),loadMap()]); }
+
+let MAP=null, LG={teams:null,reports:null,fires:null}, layerOn={teams:true,reports:true,fires:true};
+const STATUSCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
+function initMap(){
+  if(MAP||typeof L==='undefined') return;
+  MAP=L.map('map',{zoomControl:true}).setView([37.555,127.01],13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(MAP);
+  LG.teams=L.layerGroup().addTo(MAP); LG.reports=L.layerGroup().addTo(MAP); LG.fires=L.layerGroup().addTo(MAP);
+  setTimeout(function(){ if(MAP) MAP.invalidateSize(); },250);
+}
+function toggleLayer(el){
+  const k=el.dataset.layer; layerOn[k]=!layerOn[k]; el.classList.toggle('on');
+  const g=LG[k]; if(!g)return; if(layerOn[k]) g.addTo(MAP); else MAP.removeLayer(g);
+}
+function mk(lat,lng,color,r){return L.circleMarker([lat,lng],{radius:r||8,color:'#0b1626',weight:2,fillColor:color,fillOpacity:0.95});}
+async function loadMap(){
+  initMap(); if(!MAP) return;
+  try{
+    const d=await api('/map');
+    LG.teams.clearLayers(); LG.reports.clearLayers(); LG.fires.clearLayers();
+    const pts=[];
+    (d.teams||[]).forEach(function(t){
+      const c=STATUSCOL[t.status]||'#7C90A8';
+      mk(+t.lat,+t.lng,c,9).bindPopup('<b>'+esc(t.team_no)+'팀</b><br>'+(STATUS[t.status]?STATUS[t.status][0]:esc(t.status))+'<br><span style="font-family:monospace">'+esc(t.coord||'')+'</span>').addTo(LG.teams);
+      pts.push([+t.lat,+t.lng]);
+    });
+    (d.reports||[]).forEach(function(r){
+      mk(+r.lat,+r.lng,'#E8A33D',6).bindPopup('<b>정찰 보고</b> ('+esc(r.team_id)+'팀)<br>병력 '+(r.troops||0)+' · 트럭 '+(r.trucks||0)+'<br><span style="font-family:monospace">'+esc(r.coord||'')+'</span>').addTo(LG.reports);
+      pts.push([+r.lat,+r.lng]);
+    });
+    (d.fire_requests||[]).forEach(function(f){
+      mk(+f.lat,+f.lng,'#ff5b5b',7).bindPopup('<b>🔺 화력요청</b><br>'+esc(f.target||'')+' · '+(FSTAT[f.status]||f.status)+'<br><span style="font-family:monospace">'+esc(f.coord||'')+'</span>').addTo(LG.fires);
+      pts.push([+f.lat,+f.lng]);
+    });
+    if(pts.length){ try{ MAP.fitBounds(pts,{padding:[40,40],maxZoom:15}); }catch(e){} }
+  }catch(e){}
+}
 
 async function loadDash(){
   try{
