@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>IUCCS · 조종자 앱</title>
+<style>
+  :root{--bg:#0A111E;--surface:#152439;--surface2:#0b1626;--line:#24384F;--navy:#1F3A5F;
+    --steel:#2E5A88;--ink:#EAF2FC;--text:#C4D4E7;--muted:#7C90A8;--amber:#E8A33D;--amberD:#C9871B;
+    --red:#E24A3B;--yellow:#E1A800;--green:#2FA35A;--blue:#3B82D6;}
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    max-width:460px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+  .mono{font-family:"SF Mono",ui-monospace,Consolas,monospace}
+  .ribbon{padding:11px 15px;background:linear-gradient(180deg,#15243a,#111e31);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:9px;position:sticky;top:0;z-index:10}
+  .ribbon .team{font-weight:800;color:var(--ink);font-size:16px}
+  .ribbon .clk{margin-left:auto;font-size:12.5px;color:#AFC3DA}
+  .modeb{font-size:11px;font-weight:800;letter-spacing:.05em;padding:3px 9px;border-radius:6px}
+  .mode-real{background:rgba(226,74,59,.16);color:#FF8579;border:1px solid rgba(226,74,59,.5)}
+  .mode-sim{background:rgba(232,163,61,.16);color:#F3C070;border:1px solid rgba(232,163,61,.5)}
+  main{flex:1;padding:14px 14px 78px;display:flex;flex-direction:column;gap:11px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:13px 14px}
+  .lbl{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700;margin-bottom:7px}
+  .between{display:flex;align-items:center;justify-content:space-between}
+  .row{display:flex;align-items:center;gap:9px}
+  .val{color:var(--ink);font-weight:700}
+  .chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px}
+  .badge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  input,select{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:10px;
+    color:var(--ink);padding:12px;font-size:15px;font-family:inherit}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;border-radius:11px;
+    padding:13px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit}
+  .btn-amber{background:linear-gradient(180deg,var(--amber),var(--amberD));color:#1a1206}
+  .btn-ghost{background:transparent;border:1px solid var(--steel);color:#CFE0F0}
+  .seg{display:flex;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+  .seg button{flex:1;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13.5px;
+    padding:9px;border-radius:7px;cursor:pointer;font-family:inherit}
+  .seg button.on{background:var(--navy);color:#fff}
+  .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;height:64px;
+    border-top:1px solid var(--line);background:#0c182a;display:flex}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    color:var(--muted);font-size:10.5px;font-weight:700;border:none;background:none;cursor:pointer;font-family:inherit}
+  .tab.on{color:var(--amber)}
+  .tab .ic{font-size:19px}
+  h2{color:var(--ink);font-size:16px;margin:2px 0 2px}
+  .muted{color:var(--muted)}
+  .toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);background:#16324b;border:1px solid var(--steel);
+    color:#dff0ff;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:700;opacity:0;transition:.3s;z-index:30}
+  .toast.show{opacity:1}
+  /* login */
+  #login{flex:1;display:flex;flex-direction:column;justify-content:center;gap:16px;padding:24px 22px 40px}
+  .logo{width:56px;height:56px;border-radius:15px;margin:0 auto 12px;background:linear-gradient(160deg,#2e5a88,#16273f);
+    display:flex;align-items:center;justify-content:center;font-size:26px}
+  .warn{background:rgba(232,163,61,.1);border:1px solid rgba(232,163,61,.35);color:#f3c882;
+    font-size:12px;line-height:1.4;padding:9px 11px;border-radius:9px}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<section id="login">
+  <div style="text-align:center">
+    <div class="logo">🛰️</div>
+    <div style="color:var(--ink);font-weight:800;font-size:18px">통합무인전투 통제체계</div>
+    <div class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.14em;margin-top:5px">IUCCS · OPERATOR</div>
+  </div>
+  <div><div class="lbl">팀 번호</div><input id="in_team" class="mono" placeholder="예: 03" value="03" inputmode="numeric"></div>
+  <div><div class="lbl">비밀번호</div><input id="in_pw" type="password" placeholder="관리자 할당 비밀번호"></div>
+  <div><div class="lbl">운용 모드</div>
+    <div class="seg" id="loginmode">
+      <button data-m="real" class="on">실제</button><button data-m="sim">모의(훈련)</button>
+    </div>
+  </div>
+  <button class="btn btn-amber" onclick="doLogin()">🔒 접속</button>
+  <div id="login_err" class="warn" style="display:none"></div>
+  <div class="muted" style="text-align:center;font-size:12px">비밀번호는 관리자가 할당합니다</div>
+</section>
+
+<!-- ===== APP ===== -->
+<div id="app" style="display:none;flex-direction:column;flex:1">
+  <div class="ribbon">
+    <span class="team" id="rb_team">3팀</span>
+    <span class="modeb" id="rb_mode">실제</span>
+    <span class="chip" id="rb_role" style="background:rgba(59,130,214,.18);color:#8fc0ff">운용자</span>
+    <span class="clk mono" id="rb_clk">--:--:--</span>
+  </div>
+  <main id="view"></main>
+  <nav class="tabs" id="tabs">
+    <button class="tab on" data-v="home"><span class="ic">🏠</span>홈</button>
+    <button class="tab" data-v="missions"><span class="ic">🎯</span>임무</button>
+    <button class="tab" data-v="report"><span class="ic">📋</span>보고</button>
+    <button class="tab" data-v="fire"><span class="ic">📡</span>화력</button>
+    <button class="tab" data-v="alerts"><span class="ic">🔔</span>알림</button>
+  </nav>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = location.pathname.replace(/\/public\/.*$/, '') + '/api';
+let TOKEN=null, SESS={}, MODE='real';
+
+// ---- helpers ----
+async function api(path, method='GET', body=null){
+  const h={'Content-Type':'application/json'};
+  if(TOKEN) h['Authorization']='Bearer '+TOKEN;
+  const r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):null});
+  let d={}; try{d=await r.json()}catch(e){}
+  if(!r.ok) throw d;
+  return d;
+}
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1900);}
+const esc=s=>String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+const COMM={good:'양호',weak:'미약',lost:'두절'}, GPS={fixed:'고정',searching:'탐색',none:'없음'};
+const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
+const FSTAT={received:'접수',reviewing:'검토',approved:'승인',held:'보류',executed:'시행',rejected:'반려'};
+function sdot(c){return `<span class="dot" style="background:${c}"></span>`}
+function modeBadge(){document.getElementById('rb_mode').className='modeb '+(MODE==='sim'?'mode-sim':'mode-real');
+  document.getElementById('rb_mode').textContent=MODE==='sim'?'모의':'실제';}
+
+// ---- login ----
+document.querySelectorAll('#loginmode button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#loginmode button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); MODE=b.dataset.m;});
+async function doLogin(){
+  const team=document.getElementById('in_team').value.trim();
+  const pw=document.getElementById('in_pw').value;
+  const err=document.getElementById('login_err'); err.style.display='none';
+  try{
+    const r=await api('/login','POST',{team_no:team,password:pw,mode:MODE});
+    TOKEN=r.token; SESS=r; MODE=r.mode;
+    sessionStorage.setItem('iuccs_token',TOKEN); sessionStorage.setItem('iuccs_sess',JSON.stringify(r));
+    enterApp();
+  }catch(e){ err.textContent='접속 실패 — 팀 번호·비밀번호를 확인하세요.'; err.style.display='block'; }
+}
+function enterApp(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('rb_team').textContent=(SESS.team_no||'-')+'팀';
+  const roleKo={admin:'관리자',leader:'팀장',operator:'운용자',fire_coord:'화력협조',observer:'참관'}[SESS.role]||SESS.role;
+  document.getElementById('rb_role').textContent=roleKo;
+  modeBadge(); startClock(); go('home');
+}
+function startClock(){setInterval(()=>{const n=new Date();
+  document.getElementById('rb_clk').textContent=n.toTimeString().slice(0,8);},1000);}
+
+// ---- nav ----
+document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>{
+  document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); go(t.dataset.v);});
+function go(v){({home:renderHome,missions:renderMissions,report:renderReport,fire:renderFire,alerts:renderAlerts}[v])();}
+
+// ---- HOME ----
+async function renderHome(){
+  const v=document.getElementById('view');
+  v.innerHTML='<div class="muted">불러오는 중…</div>';
+  try{
+    const d=await api('/drones?team_id='+(SESS.team_id||''));
+    const drones=d.drones||[];
+    let cards=drones.map(dr=>{
+      const bp=dr.battery_pct??'-';
+      const bc=bp>=50?'var(--green)':(bp>=20?'var(--yellow)':'var(--red)');
+      return `<div class="card">
+        <div class="between" style="margin-bottom:9px"><div class="row">✈️ <span class="val">기체 ${esc(dr.code)}</span></div>
+          <span class="chip" style="background:rgba(47,163,90,.16);color:#6fe0a0">${esc(dr.status)}</span></div>
+        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot(bc)}배터리</span><span class="val mono">${bp}%</span></div>
+        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot('var(--green)')}통신</span><span class="val">${COMM[dr.comm_status]||dr.comm_status}</span></div>
+        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot('var(--green)')}GPS</span><span class="val">${GPS[dr.gps_status]||dr.gps_status}</span></div>
+        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot('var(--yellow)')}최대 비행</span><span class="val mono">${dr.max_flight_min??'-'}분</span></div>
+      </div>`;}).join('');
+    if(!drones.length) cards='<div class="card muted">배정된 기체가 없습니다.</div>';
+    v.innerHTML=`<div class="between"><div class="lbl" style="margin:0">내 역할</div>
+      <span class="badge" style="background:var(--navy);color:#cfe0f0">${document.getElementById('rb_role').textContent}</span></div>${cards}`;
+  }catch(e){ v.innerHTML=err(e); }
+}
+
+// ---- MISSIONS ----
+async function renderMissions(){
+  const v=document.getElementById('view'); v.innerHTML='<div class="muted">불러오는 중…</div>';
+  try{
+    const d=await api('/missions?team_id='+(SESS.team_id||''));
+    const ms=d.missions||[];
+    if(!ms.length){ v.innerHTML='<div class="card muted">수신된 임무가 없습니다.</div>'; return; }
+    v.innerHTML=ms.map(m=>{
+      const atk=m.type==='attack';
+      const gate=atk&&!(m.approved==1)?`<div class="warn" style="margin:9px 0">⚠ 지휘관 승인·교전규칙(ROE) 확인 후 수행 가능</div>`:'';
+      const ackBtn=m.status==='issued'?`<button class="btn btn-ghost" style="padding:10px;font-size:13px" onclick="ackMission(${m.id})">✔ 수신 확인</button>`:'';
+      return `<div class="card" ${atk?'style="border-color:rgba(232,163,61,.45)"':''}>
+        <div class="between" style="margin-bottom:8px">
+          <span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span>
+          <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></div>
+        <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">위치</span><span class="mono" style="color:#CFE0F0">${esc(m.coord||'-')}</span></div>
+        <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${atk?'방식':'경로'}</span><span class="val" style="font-size:13px">${esc(atk?(m.method||'표적지정'):(m.route||'-'))}</span></div>
+        ${gate}${ackBtn}</div>`;}).join('');
+  }catch(e){ v.innerHTML=err(e); }
+}
+async function ackMission(id){ try{ await api('/missions/ack','POST',{id}); toast('수신 확인됨'); renderMissions(); }catch(e){toast('실패');} }
+
+// ---- REPORT ----
+let RKIND='recon';
+function renderReport(){
+  const v=document.getElementById('view');
+  v.innerHTML=`
+    <h2>결과 보고</h2>
+    <div class="seg" id="rkind"><button data-k="recon" class="on">정찰</button><button data-k="attack">공격 / 피해</button></div>
+    <div class="card"><div class="lbl">식별 위치 (군사좌표)</div><input id="r_coord" class="mono" placeholder="WQ 0000 0000"></div>
+    <div id="rfields"></div>
+    <button class="btn btn-amber" onclick="submitReport()">✔ 보고 전송</button>`;
+  document.querySelectorAll('#rkind button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#rkind button').forEach(x=>x.classList.remove('on'));b.classList.add('on');RKIND=b.dataset.k;rfields();});
+  rfields();
+}
+function numRow(id,label){return `<div class="between" style="padding:7px 0"><span>${label}</span>
+  <input id="${id}" type="number" inputmode="numeric" style="width:90px;text-align:right" value="0"></div>`;}
+function rfields(){
+  const el=document.getElementById('rfields');
+  if(RKIND==='recon'){
+    el.innerHTML=`<div class="card">${numRow('r_troops','병력')}${numRow('r_trucks','트럭')}${numRow('r_vehicles','일반차량')}</div>`;
+  }else{
+    el.innerHTML=`<div class="card">${numRow('r_armed','무장')}${numRow('r_unarmed','비무장')}
+      <div class="lbl" style="margin:10px 0 6px">피해 판정</div>
+      ${numRow('r_kia','사망')}${numRow('r_serious','중상')}${numRow('r_minor','경상')}
+      <label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="r_failed" style="width:18px;height:18px"> 임무 실패</label></div>`;
+  }
+}
+async function submitReport(){
+  const g=id=>{const e=document.getElementById(id);return e?e.value:null;};
+  const body={team_id:SESS.team_id,kind:RKIND,mode:MODE,coord:g('r_coord')};
+  if(RKIND==='recon'){Object.assign(body,{troops:+g('r_troops'),trucks:+g('r_trucks'),vehicles:+g('r_vehicles')});}
+  else{Object.assign(body,{armed:+g('r_armed'),unarmed:+g('r_unarmed'),kia:+g('r_kia'),serious:+g('r_serious'),minor:+g('r_minor'),failed:document.getElementById('r_failed').checked?1:0});}
+  try{ await api('/reports','POST',body); toast('보고 전송됨'); renderReport(); }catch(e){ toast('전송 실패'); }
+}
+
+// ---- FIRE ----
+let FSUP='higher';
+function renderFire(){
+  const v=document.getElementById('view');
+  v.innerHTML=`
+    <h2>화력협조 요청</h2>
+    <div class="card"><div class="lbl">요청 위치 (군사좌표)</div><input id="f_coord" class="mono" placeholder="WQ 0000 0000"></div>
+    <div class="card"><div class="lbl">표적</div><input id="f_target" placeholder="예: 차량·병력"></div>
+    <div class="card"><div class="lbl">규모</div>
+      <select id="f_scale"><option value="소">소</option><option value="중" selected>중</option><option value="대">대</option></select></div>
+    <div><div class="lbl">요청 대상</div><div class="seg" id="fsup">
+      <button data-s="higher" class="on">상급부대</button><button data-s="adjacent">인접부대</button></div></div>
+    <button class="btn btn-amber" style="margin-top:4px" onclick="submitFire()">📡 요청 전송</button>`;
+  document.querySelectorAll('#fsup button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#fsup button').forEach(x=>x.classList.remove('on'));b.classList.add('on');FSUP=b.dataset.s;});
+}
+async function submitFire(){
+  const g=id=>document.getElementById(id).value;
+  try{ await api('/fire-requests','POST',{team_id:SESS.team_id,coord:g('f_coord'),target:g('f_target'),scale:g('f_scale'),support_from:FSUP,mode:MODE});
+    toast('화력요청 전송됨'); }catch(e){ toast('전송 실패'); }
+}
+
+// ---- ALERTS ----
+async function renderAlerts(){
+  const v=document.getElementById('view'); v.innerHTML='<div class="muted">불러오는 중…</div>';
+  try{
+    const d=await api('/missions?team_id='+(SESS.team_id||''));
+    const recent=(d.missions||[]).slice(0,8);
+    v.innerHTML='<h2>알림</h2>'+(recent.length?recent.map(m=>`<div class="card between">
+      <div class="row">${m.type==='attack'?'🔴':'🔵'} <span style="font-size:13px">${m.type==='attack'?'공격':'정찰'} 임무 · ${MSTAT[m.status]||m.status}</span></div>
+      <span class="mono muted" style="font-size:11px">#${m.id}</span></div>`).join(''):'<div class="card muted">알림이 없습니다.</div>');
+  }catch(e){ v.innerHTML=err(e); }
+}
+
+function err(e){return `<div class="warn">불러오기 실패: ${esc(e&&e.error||'네트워크 오류')}</div>`;}
+
+// ---- restore session ----
+(function(){
+  const t=sessionStorage.getItem('iuccs_token');
+  if(t){ TOKEN=t; try{SESS=JSON.parse(sessionStorage.getItem('iuccs_sess')||'{}')}catch(e){} MODE=SESS.mode||'real'; enterApp(); }
+})();
+</script>
+</body>
+</html>

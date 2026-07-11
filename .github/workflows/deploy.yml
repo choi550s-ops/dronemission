@@ -1,0 +1,51 @@
+name: Deploy to Web Hosting (FTP)
+
+# main에 push하면 FTP로 서버에 업로드합니다.
+# DB 테이블 생성은 배포 후 migrate.php(토큰 보호)를 호출해 처리합니다.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ftp
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server:     ${{ secrets.FTP_SERVER }}
+          username:   ${{ secrets.FTP_USERNAME }}
+          password:   ${{ secrets.FTP_PASSWORD }}
+          port:       ${{ secrets.FTP_PORT || 21 }}
+          protocol:   ftp
+          local-dir:  ./
+          server-dir: ${{ secrets.FTP_SERVER_DIR }}
+          # .env 는 서버에 직접 올린 것을 유지하려고 업로드에서 제외합니다.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/*.md
+            .env
+            .env.example
+            **/node_modules/**
+
+      - name: Run DB migration (optional)
+        env:
+          SITE_URL:      ${{ secrets.SITE_URL }}
+          MIGRATE_TOKEN: ${{ secrets.MIGRATE_TOKEN }}
+        run: |
+          if [ -n "$SITE_URL" ] && [ -n "$MIGRATE_TOKEN" ]; then
+            echo "Calling migrate endpoint..."
+            curl -fsS "${SITE_URL%/}/migrate.php?token=${MIGRATE_TOKEN}" && echo "" || \
+              echo "migration call failed — 브라우저에서 수동으로 한 번 호출하세요."
+          else
+            echo "SITE_URL / MIGRATE_TOKEN 미설정 — 배포 후 브라우저에서 https://도메인/migrate.php?token=... 을 한 번 여세요."
+          fi

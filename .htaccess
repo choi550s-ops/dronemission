@@ -1,0 +1,24 @@
+# --- IUCCS Apache configuration (shared hosting) ---
+
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Pass the Authorization header through to PHP (many hosts strip it).
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Serve real files/dirs directly; route everything else to the front controller.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Block direct access to sensitive files.
+<FilesMatch "^\.env$|\.sql$|composer\.(json|lock)$|\.md$|\.gitignore$|\.ya?ml$">
+    Require all denied
+</FilesMatch>
+
+# Block direct access to code/config/data directories.
+RedirectMatch 403 ^/?(config|src|bin|db|\.github|\.git)(/|$)
