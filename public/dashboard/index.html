@@ -77,14 +77,19 @@
   .resp-ack{background:rgba(47,163,90,.16);color:#6fe0a0}
   .resp-unable{background:rgba(226,74,59,.16);color:#ff8579}
   .resp-delay{background:rgba(232,163,61,.16);color:var(--amber)}
+  #board td{white-space:nowrap;vertical-align:middle}
+  #board td.wrap-ok{white-space:normal}
+  .roe-inline{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .roe-inline label{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text);cursor:pointer}
+  .roe-inline input{width:14px;height:14px;flex:none;padding:0}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#16324b;border:1px solid var(--steel);
+    color:#dff0ff;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;opacity:0;transition:.3s;z-index:60;pointer-events:none}
+  .toast.show{opacity:1}
+  @keyframes pulseHi{0%,100%{box-shadow:0 0 0 0 rgba(232,163,61,.6)}50%{box-shadow:0 0 0 6px rgba(232,163,61,0)}}
+  .pulse-highlight{animation:pulseHi 0.6s ease-in-out 3; border-color:var(--amber)!important}
   .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#12222f;font-weight:800;font-size:10.5px;padding:0}
   .wp:before,.wp:after{display:none!important}
   #drawbtn.on-draw{background:linear-gradient(180deg,#E8A33D,#C9871B);color:#1a1206;border-color:transparent}
-  .bcard{border:1px solid var(--line);border-radius:11px;padding:9px 12px;background:var(--surface2)}
-  .bcard.attack{border-color:rgba(226,74,59,.4)}
-  .brep{border-top:1px dashed var(--line);margin-top:7px;padding-top:7px;font-size:12px}
-  .brep-row{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
-  .brep-empty{color:var(--muted);font-size:11.5px;padding:5px 0}
   .lyr{font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);cursor:pointer;user-select:none}
   .lyr.on{background:var(--navy);color:#fff;border-color:var(--steel)}
 
@@ -219,19 +224,24 @@
     <div class="card">
       <div class="between" style="margin-bottom:2px;flex:none">
         <h2 style="margin:0">임무 지시 현황판</h2>
-        <span class="muted" style="font-size:11px">하달 정보 + 결과 보고 연동</span>
+        <span class="muted" style="font-size:11px">하달 정보 + 현장 응답 + 결과 보고 연동</span>
       </div>
-      <div class="scrollbody" id="board" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
+      <div class="scrollbody">
+        <table><thead><tr><th>유형</th><th>팀</th><th>좌표</th><th>상태</th><th>현장 응답</th><th>최근 보고</th></tr></thead>
+          <tbody id="board"></tbody></table>
+      </div>
     </div>
     <div class="card">
       <h2 style="flex:none">최근 보고 (전체)</h2>
       <div class="scrollbody">
-        <table><thead><tr><th>시각</th><th>팀</th><th>종류</th><th>좌표</th><th>모드</th><th>내용</th><th></th></tr></thead>
+        <table><thead><tr><th>시각</th><th>팀</th><th>종류</th><th>좌표</th><th>모드</th><th>내용</th><th>조치</th></tr></thead>
           <tbody id="reports"></tbody></table>
       </div>
     </div>
   </div>
 </div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 const API=location.pathname.replace(/\/public\/.*$/,'')+'/api';
@@ -290,34 +300,33 @@ async function approveMission(id){
 async function loadBoard(){
   try{
     const d=await api('/missions/board');
-    const ms=(d.missions||[]).slice(0,15);
+    const ms=(d.missions||[]).slice(0,20);
     document.getElementById('board').innerHTML = ms.length ? ms.map(function(m){
       const atk=m.type==='attack';
       const teamNo=TEAMNO[m.team_id]||m.team_id;
       const reps=m.reports||[];
-      const repsHtml = reps.length ? reps.map(function(r){
-        const c = r.kind==='recon' ? `병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}${r.hostile==1?' · 🔺적식별':''}`
-                : `무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}${r.failed==1?' · 실패':''}`;
-        return `<div class="brep-row"><span>${esc(String(r.created_at)).slice(5,16)} · ${esc(coordText(r.lat,r.lng,r.coord))}</span>
-          <span style="text-align:right">${esc(c)} ${r.acknowledged==1?'<span class="muted">(확인)</span>':`<button class="btn btn-ghost" style="padding:3px 9px;font-size:11px" onclick="ackReport(${r.id})">확인</button>`}</span></div>`;
-      }).join('') : '<div class="brep-empty">아직 결과 보고 없음</div>';
-      const approveBlock = (atk && m.status==='pending_approval' && ROLE==='admin') ? `
-        <div class="warn" style="margin-top:8px">
-          <label style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:8px;cursor:pointer">
-            <input type="checkbox" id="roe_${m.id}" style="width:16px;height:16px;flex:none"> 교전규칙(ROE) 확인함
-          </label>
-          <button class="btn btn-amber" style="padding:7px 14px;font-size:12px" onclick="approveMission(${m.id})">승인 및 하달</button>
-        </div>` : '';
-      return `<div class="bcard ${atk?'attack':''}">
-        <div class="between">
-          <span><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span>
-            <span style="margin-left:8px;font-weight:700;color:${esc(TEAMCOLORS[m.team_id]||'#cfe0f0')}">${esc(teamNo)}팀</span>
-            <span class="mono muted" style="margin-left:8px;font-size:11.5px">${esc(coordText(m.lat,m.lng,m.coord))}</span></span>
-          <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></div>
-        <div style="margin-top:6px">${respTag(m)}</div>
-        ${approveBlock}
-        <div class="brep">${repsHtml}</div></div>`;
-    }).join('') : '<div class="muted" style="font-size:12.5px">지시된 임무가 없습니다.</div>';
+      let lastRepHtml='<span class="muted">보고 없음</span>';
+      if(reps.length){
+        const r=reps[0];
+        const c = r.kind==='recon' ? `병력${r.troops??0}·트럭${r.trucks??0}·차량${r.vehicles??0}${r.hostile==1?' 🔺':''}`
+                : `무장${r.armed??0}·비무장${r.unarmed??0}·사망${r.kia??0}${r.failed==1?' 실패':''}`;
+        const more = reps.length>1?` <span class="muted">(+${reps.length-1}건)</span>`:'';
+        const ackBtn = r.acknowledged==1?'<span class="muted">(확인)</span>':`<button class="btn btn-ghost" style="padding:2px 8px;font-size:10.5px" onclick="ackReport(${r.id})">확인</button>`;
+        lastRepHtml = `<span style="font-size:11.5px">${esc(c)}</span>${more} ${ackBtn}`;
+      }
+      const respCell = (atk && m.status==='pending_approval' && ROLE==='admin') ? `
+        <div class="roe-inline">
+          <label><input type="checkbox" id="roe_${m.id}"> ROE확인</label>
+          <button class="btn btn-amber" style="padding:4px 9px;font-size:10.5px" onclick="approveMission(${m.id})">승인·하달</button>
+        </div>` : respTag(m);
+      return `<tr>
+        <td><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span></td>
+        <td style="font-weight:700;color:${esc(TEAMCOLORS[m.team_id]||'#cfe0f0')}">${esc(teamNo)}팀</td>
+        <td class="mono" style="font-size:11px">${esc(coordText(m.lat,m.lng,m.coord))}</td>
+        <td><span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></td>
+        <td>${respCell}</td>
+        <td class="wrap-ok">${lastRepHtml}</td></tr>`;
+    }).join('') : '<tr><td colspan="6" class="muted">지시된 임무가 없습니다.</td></tr>';
   }catch(e){}
 }
 
@@ -488,16 +497,42 @@ async function loadReports(){
       let c=r.kind==='recon'?`병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}${r.hostile==1?' · 🔺적식별':''}`
         :`무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}`;
       const teamNo=TEAMNO[r.team_id]||r.team_id;
+      const coordStr=coordText(r.lat,r.lng,r.coord);
+      let actionCell;
+      if(r.acknowledged==1){ actionCell='<span class="muted">처리됨</span>'; }
+      else if(r.hostile==1){
+        const coordArg=String(coordStr||'').replace(/'/g,"\\'");
+        actionCell=`<div style="display:flex;gap:5px">
+          <button class="btn btn-ghost" style="padding:4px 8px;font-size:10.5px" onclick="ackReport(${r.id})">보류</button>
+          <button class="btn btn-amber" style="padding:4px 8px;font-size:10.5px" onclick="assignAttackFromReport(${r.id},${r.lat==null?'null':+r.lat},${r.lng==null?'null':+r.lng},'${coordArg}')">공격지정</button>
+        </div>`;
+      } else {
+        actionCell=`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`;
+      }
       return `<tr><td class="muted mono" data-label="시각" style="font-size:11px">${esc(String(r.created_at)).slice(5,16)}</td>
         <td data-label="팀" style="color:${teamColorForNo(teamNo)};font-weight:700">${esc(teamNo)}팀</td><td data-label="종류">${r.kind==='recon'?'정찰':(r.kind==='attack'?'공격':'사진')}</td>
-        <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordText(r.lat,r.lng,r.coord))}</td>
+        <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordStr)}</td>
         <td data-label="모드"><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
         <td data-label="내용" style="font-size:12px">${esc(c)}</td>
-        <td data-label="처리">${r.acknowledged==1?'<span class="muted">확인</span>':`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`}</td></tr>`;}).join('')
+        <td data-label="조치">${actionCell}</td></tr>`;}).join('')
       :'<tr><td colspan="7" class="muted">보고 없음</td></tr>';
   }catch(e){}
 }
 async function ackReport(id){ try{ await api('/reports/ack','POST',{id}); loadReports(); loadDash(); loadBoard(); }catch(e){alert('실패');} }
+function toast(msg){ const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},2200); }
+function assignAttackFromReport(reportId, lat, lng, coord){
+  const typeSel=document.getElementById('m_type');
+  typeSel.value='attack'; onTypeChange();
+  document.getElementById('m_coord').value=coord||'';
+  ROUTE = (lat!=null && lng!=null && !isNaN(lat) && !isNaN(lng)) ? [[+lat,+lng]] : [];
+  redrawRoute();
+  const sel=document.getElementById('m_team');
+  sel.focus();
+  sel.classList.add('pulse-highlight');
+  setTimeout(function(){ sel.classList.remove('pulse-highlight'); }, 2000);
+  ackReport(reportId);
+  toast('🎯 공격 임무 대상 지정됨 — 팀을 선택하고 "임무 하달"을 누르세요');
+}
 
 async function issueMission(){
   const body={team_id:document.getElementById('m_team').value,type:document.getElementById('m_type').value,
