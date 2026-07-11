@@ -100,7 +100,13 @@ function route($path, $method)
             "SELECT id, team_id, coord, target, scale, status, lat, lng, created_at
                FROM iuccs_fire_requests WHERE lat IS NOT NULL ORDER BY created_at DESC LIMIT 50"
         )->fetchAll();
-        json_out(array('teams' => $teams, 'reports' => $reports, 'fire_requests' => $fires));
+        $missionRoutes = $pdo->query(
+            "SELECT id, team_id, type, status, coord, route_points
+               FROM iuccs_missions
+              WHERE route_points IS NOT NULL AND status NOT IN ('completed','cancelled')
+              ORDER BY issued_at DESC LIMIT 30"
+        )->fetchAll();
+        json_out(array('teams' => $teams, 'reports' => $reports, 'fire_requests' => $fires, 'mission_routes' => $missionRoutes));
     }
 
     if ($path === '/api/teams') {
@@ -217,6 +223,31 @@ function route($path, $method)
         $b = body_json();
         $pdo->prepare("UPDATE iuccs_missions SET status = 'acknowledged' WHERE id = ? AND status = 'issued'")
             ->execute(array(pval($b, 'id', 0)));
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/missions/respond' && $method === 'POST') {
+        $s    = Auth::require_auth();
+        $b    = body_json();
+        $id   = pval($b, 'id');
+        $resp = pval($b, 'response', '');
+        if (!in_array($resp, array('ack', 'unable', 'delay'), true)) {
+            json_out(array('error' => 'invalid_response'), 400);
+        }
+        if ($s['role'] !== 'admin') {
+            $chk = $pdo->prepare("SELECT team_id FROM iuccs_missions WHERE id = ?");
+            $chk->execute(array($id));
+            $row = $chk->fetch();
+            if (!$row || $row['team_id'] != $s['team_id']) { json_out(array('error' => 'forbidden'), 403); }
+        }
+        $reason = pval($b, 'reason');
+        $delay  = pval($b, 'delay_min');
+        $sql    = "UPDATE iuccs_missions SET response_type = ?, response_reason = ?, response_delay_min = ?, responded_at = NOW()";
+        $params = array($resp, $reason, $delay);
+        if ($resp === 'ack') { $sql .= ", status = 'acknowledged'"; }
+        $sql   .= " WHERE id = ?";
+        $params[] = $id;
+        $pdo->prepare($sql)->execute($params);
+        log_activity('team#' . pval($s, 'team_id', '?'), 'mission_respond', 'mission', $id, $resp . ($reason ? (':' . $reason) : ''));
         json_out(array('ok' => true));
     }
     if ($path === '/api/missions/approve' && $method === 'POST') {

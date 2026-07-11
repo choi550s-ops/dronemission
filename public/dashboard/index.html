@@ -46,12 +46,18 @@
 
   /* ---------- one-screen desktop layout ---------- */
   .wrap{flex:1;display:flex;flex-direction:column;gap:10px;padding:12px 16px;overflow:hidden;min-height:0}
-  .stripbar{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .opgrid{flex:1;display:grid;grid-template-columns:280px 1fr 320px;gap:10px;min-height:0}
+  .opgrid{flex:1;display:grid;grid-template-columns:280px 1fr 340px;gap:10px;min-height:0}
   .col{min-height:0;display:flex;flex-direction:column}
   .colLeft{overflow-y:auto}
   .colCenter{overflow:hidden;display:flex;flex-direction:column}
   .colRight{overflow-y:auto;gap:10px}
+  .ministats{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;flex:none}
+  .ministat{display:flex;align-items:baseline;justify-content:space-between;background:var(--surface2);
+    border:1px solid var(--line);border-radius:8px;padding:6px 11px}
+  .ministat .n{font-size:19px;font-weight:800;color:var(--ink)}
+  .ministat .l{font-size:11px;color:var(--muted)}
+  #teams tbody tr{cursor:pointer}
+  #teams tbody tr:hover{background:rgba(255,255,255,.03)}
   .bottomrow{flex:none;height:220px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .bottomrow .card{overflow-y:auto;height:100%;display:flex;flex-direction:column}
   .bottomrow .card .scrollbody{overflow-y:auto;flex:1;min-height:0}
@@ -62,9 +68,15 @@
   .leg span{display:inline-flex;align-items:center;gap:5px}
   .leg i{width:10px;height:10px;border-radius:50%;display:inline-block}
   .leg i.diamond-leg{border-radius:0;transform:rotate(45deg);width:8px;height:8px}
+  .leg i.line-leg{width:14px;height:2px;border-radius:0}
 
-  .mcoords{font-size:11.5px;color:var(--text);margin-top:6px;max-height:70px;overflow:auto;line-height:1.55}
+  .mcoords{font-size:11.5px;color:var(--text);margin-top:6px;max-height:120px;overflow:auto;line-height:1.55}
   .mcoords .mono{color:#cfe0f0}
+  .resp-chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;display:inline-block}
+  .resp-none{background:rgba(124,144,168,.16);color:var(--muted)}
+  .resp-ack{background:rgba(47,163,90,.16);color:#6fe0a0}
+  .resp-unable{background:rgba(226,74,59,.16);color:#ff8579}
+  .resp-delay{background:rgba(232,163,61,.16);color:var(--amber)}
   .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#12222f;font-weight:800;font-size:10.5px;padding:0}
   .wp:before,.wp:after{display:none!important}
   #drawbtn.on-draw{background:linear-gradient(180deg,#E8A33D,#C9871B);color:#1a1206;border-color:transparent}
@@ -96,7 +108,7 @@
   @media(max-width:900px){
     body{display:block;height:auto}
     .wrap{display:block;height:auto;overflow:visible;padding:14px 12px 52px}
-    .stripbar{grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}
+    .ministats{margin-bottom:12px}
     .stat{padding:10px 12px}
     .stat .n{font-size:22px}
     .opgrid{display:block}
@@ -146,10 +158,9 @@
 </header>
 
 <div class="wrap" id="wrap" style="display:none">
-  <div class="stripbar" id="counts"></div>
-
   <div class="opgrid">
     <div class="col colLeft card">
+      <div class="ministats" id="counts"></div>
       <h2>팀 · 자산 현황</h2>
       <table><thead><tr><th>팀</th><th>상태</th><th>좌표</th><th>기체</th></tr></thead>
         <tbody id="teams"></tbody></table>
@@ -163,6 +174,7 @@
           <span class="lyr on" data-layer="teams" onclick="toggleLayer(this)">팀</span>
           <span class="lyr on" data-layer="reports" onclick="toggleLayer(this)">정찰</span>
           <span class="lyr on" data-layer="fires" onclick="toggleLayer(this)">화력요청</span>
+          <span class="lyr on" data-layer="missionRoutes" onclick="toggleLayer(this)">경로</span>
         </div>
       </div>
       <div id="map"></div>
@@ -174,6 +186,7 @@
         <span><i class="diamond-leg" style="background:#E24A3B"></i>적 식별 보고</span>
         <span><i style="background:#E8A33D"></i>정찰 결과</span>
         <span><i style="background:#ff5b5b"></i>화력요청</span>
+        <span><i class="line-leg" style="background:#E8A33D"></i>임무 경로</span>
         <span class="muted">· 채움색 = 팀 고유색</span>
       </div>
     </div>
@@ -181,18 +194,18 @@
     <div class="col colRight" style="display:flex;flex-direction:column;gap:10px">
       <div class="card">
         <h2>임무 지시</h2>
-        <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;flex-direction:column;gap:9px">
           <select id="m_team" onchange="redrawRoute()"></select>
           <select id="m_type" onchange="onTypeChange()"><option value="recon">정찰</option><option value="attack">공격</option></select>
           <input id="m_coord" class="mono" placeholder="군사좌표 자동 (지도 지정 시)">
           <input id="m_route" placeholder="비고/방식 (예: 자율 / 표적지정)">
-          <button class="btn btn-ghost" id="drawbtn" style="padding:8px" onclick="toggleDraw()">✎ 지도에서 경로 그리기</button>
+          <button class="btn btn-ghost" id="drawbtn" style="padding:9px" onclick="toggleDraw()">✎ 지도에서 경로 그리기</button>
           <div class="mcoords" id="m_coords"><span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span></div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost" style="padding:8px;flex:1" onclick="clearRoute()">초기화</button>
-            <button class="btn btn-amber" style="padding:10px;flex:2" onclick="issueMission()">임무 하달</button>
+            <button class="btn btn-ghost" style="padding:9px;flex:1" onclick="clearRoute()">초기화</button>
+            <button class="btn btn-amber" style="padding:11px;flex:2" onclick="issueMission()">임무 하달</button>
           </div>
-          <div class="muted" style="font-size:11px">※ 공격 임무는 승인·ROE 확인 후 하달됩니다.</div>
+          <div class="muted" style="font-size:11px">※ 공격 임무는 승인·ROE 확인 후 하달됩니다. 경로는 하달 후 지도에 상시 표시(끄기 가능)됩니다.</div>
         </div>
       </div>
       <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
@@ -213,7 +226,7 @@
     <div class="card">
       <h2 style="flex:none">최근 보고 (전체)</h2>
       <div class="scrollbody">
-        <table><thead><tr><th>시각</th><th>팀</th><th>종류</th><th>모드</th><th>내용</th><th></th></tr></thead>
+        <table><thead><tr><th>시각</th><th>팀</th><th>종류</th><th>좌표</th><th>모드</th><th>내용</th><th></th></tr></thead>
           <tbody id="reports"></tbody></table>
       </div>
     </div>
@@ -258,6 +271,13 @@ function startClock(){setInterval(()=>document.getElementById('clk').textContent
 async function loadAll(){ await Promise.all([loadDash(),loadFires(),loadReports(),loadMap(),loadBoard()]); }
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
 
+function respTag(m){
+  const t=m.response_type;
+  if(t==='ack') return '<span class="resp-chip resp-ack">✔ 수신확인</span>';
+  if(t==='unable') return '<span class="resp-chip resp-unable">✖ 임무불가'+(m.response_reason?' (사유: '+esc(m.response_reason)+')':'')+'</span>';
+  if(t==='delay') return '<span class="resp-chip resp-delay">⏱ 준비시간 '+(m.response_delay_min||0)+'분'+(m.response_reason?' (사유: '+esc(m.response_reason)+')':'')+'</span>';
+  return '<span class="resp-chip resp-none">⏳ 미응답</span>';
+}
 async function loadBoard(){
   try{
     const d=await api('/missions/board');
@@ -278,22 +298,35 @@ async function loadBoard(){
             <span style="margin-left:8px;font-weight:700;color:${esc(TEAMCOLORS[m.team_id]||'#cfe0f0')}">${esc(teamNo)}팀</span>
             <span class="mono muted" style="margin-left:8px;font-size:11.5px">${esc(coordText(m.lat,m.lng,m.coord))}</span></span>
           <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></div>
+        <div style="margin-top:6px">${respTag(m)}</div>
         <div class="brep">${repsHtml}</div></div>`;
     }).join('') : '<div class="muted" style="font-size:12.5px">지시된 임무가 없습니다.</div>';
   }catch(e){}
 }
 
-let MAP=null, LG={teams:null,reports:null,fires:null,route:null}, layerOn={teams:true,reports:true,fires:true};
+let MAP=null, LG={teams:null,reports:null,fires:null,route:null,missionRoutes:null},
+  layerOn={teams:true,reports:true,fires:true,missionRoutes:true}, TEAM_MARKERS={};
 const STATUSCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
 function initMap(){
   if(MAP||typeof L==='undefined') return;
   MAP=L.map('map',{zoomControl:true}).setView([37.555,127.01],13);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(MAP);
   LG.teams=L.layerGroup().addTo(MAP); LG.reports=L.layerGroup().addTo(MAP); LG.fires=L.layerGroup().addTo(MAP);
-  LG.route=L.layerGroup().addTo(MAP);
+  LG.route=L.layerGroup().addTo(MAP); LG.missionRoutes=L.layerGroup().addTo(MAP);
   MLINE=L.polyline([],{color:'#E8A33D',weight:3,dashArray:'6,7'}).addTo(LG.route);
   MAP.on('click',function(e){ if(DRAW) addRoutePoint(e.latlng.lat,e.latlng.lng); });
   setTimeout(function(){ if(MAP) MAP.invalidateSize(); },250);
+}
+function flashTeam(id){
+  const m=TEAM_MARKERS[id]; if(!m||!MAP) return;
+  MAP.panTo(m.getLatLng());
+  const baseR=10, baseW=3;
+  let n=0;
+  const iv=setInterval(function(){
+    n++;
+    if(n%2===1){ m.setStyle({radius:18,weight:6}); } else { m.setStyle({radius:baseR,weight:baseW}); }
+    if(n>=6){ clearInterval(iv); m.setStyle({radius:baseR,weight:baseW}); }
+  },220);
 }
 function toggleLayer(el){
   const k=el.dataset.layer; layerOn[k]=!layerOn[k]; el.classList.toggle('on');
@@ -307,7 +340,8 @@ async function loadMap(){
   try{
     const d=await api('/map');
     (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); });
-    LG.teams.clearLayers(); LG.reports.clearLayers(); LG.fires.clearLayers();
+    LG.teams.clearLayers(); LG.reports.clearLayers(); LG.fires.clearLayers(); LG.missionRoutes.clearLayers();
+    TEAM_MARKERS={};
     const pts=[];
     (d.teams||[]).forEach(function(t){
       const border=STATUSCOL[t.status]||'#7C90A8';
@@ -316,6 +350,7 @@ async function loadMap(){
       m.bindPopup('<b>'+esc(t.team_no)+'팀</b><br>'+(STATUS[t.status]?STATUS[t.status][0]:esc(t.status))+'<br><span style="font-family:monospace">'+esc(coordText(t.lat,t.lng,t.coord))+'</span>');
       m.bindTooltip(esc(t.team_no)+'팀',{permanent:true,direction:'right',offset:[11,0],className:'teamlabel'});
       m.addTo(LG.teams);
+      TEAM_MARKERS[t.id]=m;
       pts.push([+t.lat,+t.lng]);
     });
     (d.reports||[]).forEach(function(r){
@@ -337,6 +372,23 @@ async function loadMap(){
       m.bindPopup('<b>🔺 화력요청</b> ('+esc(teamNo)+'팀)<br>'+esc(f.target||'')+' · '+(FSTAT[f.status]||f.status)+'<br><span style="font-family:monospace">'+esc(coordText(f.lat,f.lng,f.coord))+'</span>');
       m.addTo(LG.fires);
       pts.push([+f.lat,+f.lng]);
+    });
+    (d.mission_routes||[]).forEach(function(mr){
+      if(!mr.route_points) return;
+      let rp; try{ rp=JSON.parse(mr.route_points); }catch(e){ return; }
+      if(!rp||!rp.length) return;
+      const color=TEAMCOLORS[mr.team_id]||'#E8A33D';
+      const teamNo=TEAMNO[mr.team_id]||mr.team_id;
+      if(rp.length>1){
+        L.polyline(rp,{color:color,weight:2.5,dashArray:'5,6',opacity:0.85})
+          .bindTooltip(esc(teamNo)+'팀 경로 · '+(mr.type==='attack'?'공격':'정찰'),{sticky:true})
+          .addTo(LG.missionRoutes);
+      }
+      rp.forEach(function(p,i){
+        L.circleMarker(p,{radius:6,weight:1.5,color:'#0b1626',fillColor:color,fillOpacity:.9})
+          .bindTooltip(String(i+1),{permanent:true,direction:'center',className:'wp'})
+          .addTo(LG.missionRoutes);
+      });
     });
     if(pts.length){ try{ MAP.fitBounds(pts,{padding:[30,30],maxZoom:15}); }catch(e){} }
   }catch(e){}
@@ -385,12 +437,12 @@ async function loadDash(){
     const d=await api('/dashboard');
     (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); });
     document.getElementById('counts').innerHTML=`
-      <div class="stat"><div class="n">${d.counts.missions_pending}</div><div class="l">대기 임무</div></div>
-      <div class="stat"><div class="n">${d.counts.reports_unack}</div><div class="l">미확인 보고</div></div>
-      <div class="stat"><div class="n">${d.counts.fire_pending}</div><div class="l">화력요청 대기</div></div>`;
+      <div class="ministat"><span class="n">${d.counts.missions_pending}</span><span class="l">대기 임무</span></div>
+      <div class="ministat"><span class="n">${d.counts.reports_unack}</span><span class="l">미확인 보고</span></div>
+      <div class="ministat"><span class="n">${d.counts.fire_pending}</span><span class="l">화력요청 대기</span></div>`;
     document.getElementById('teams').innerHTML=(d.teams||[]).map(t=>{
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
-      return `<tr><td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">${esc(t.team_no)}팀</td>
+      return `<tr onclick="flashTeam(${t.id})"><td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
         <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordText(t.lat,t.lng,t.coord))}</td><td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
     const sel=document.getElementById('m_team');
@@ -421,10 +473,11 @@ async function loadReports(){
       const teamNo=TEAMNO[r.team_id]||r.team_id;
       return `<tr><td class="muted mono" data-label="시각" style="font-size:11px">${esc(String(r.created_at)).slice(5,16)}</td>
         <td data-label="팀" style="color:${teamColorForNo(teamNo)};font-weight:700">${esc(teamNo)}팀</td><td data-label="종류">${r.kind==='recon'?'정찰':(r.kind==='attack'?'공격':'사진')}</td>
+        <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordText(r.lat,r.lng,r.coord))}</td>
         <td data-label="모드"><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
         <td data-label="내용" style="font-size:12px">${esc(c)}</td>
         <td data-label="처리">${r.acknowledged==1?'<span class="muted">확인</span>':`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`}</td></tr>`;}).join('')
-      :'<tr><td colspan="6" class="muted">보고 없음</td></tr>';
+      :'<tr><td colspan="7" class="muted">보고 없음</td></tr>';
   }catch(e){}
 }
 async function ackReport(id){ try{ await api('/reports/ack','POST',{id}); loadReports(); loadDash(); loadBoard(); }catch(e){alert('실패');} }
