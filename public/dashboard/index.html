@@ -166,6 +166,8 @@
   <span class="build">[시범운용]</span>
   <span class="modeb mode-real" id="mode">실제</span>
   <span class="clk mono" id="clk">--:--:--</span>
+  <button id="dash_logout" onclick="doLogout()" title="로그아웃"
+    style="background:none;border:none;color:var(--muted);font-size:17px;margin-left:10px;padding:0 2px;cursor:pointer;line-height:1">⏻</button>
 </header>
 
 <div class="wrap" id="wrap" style="display:none">
@@ -677,6 +679,7 @@ async function issueMission(){
     loadDash(); loadMap(); loadBoard();
   }catch(e){ alert(e.error==='forbidden'?'권한이 없습니다 (관리자/팀장).':'하달 실패'); }
 }
+function doLogout(){ if(!confirm('로그아웃 하시겠습니까?')) return; logout(); }
 function logout(){ sessionStorage.removeItem('iuccs_dash_token'); sessionStorage.removeItem('iuccs_dash_role'); location.reload(); }
 
 // auto-enter if token present

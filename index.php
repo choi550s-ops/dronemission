@@ -14,7 +14,61 @@ $path   = '/' . ltrim($path, '/');
 $method = $_SERVER['REQUEST_METHOD'];
 
 if ($path === '/' || $path === '') {
-    header('Location: ' . $base . '/public/dashboard/');
+    header('Content-Type: text/html; charset=utf-8');
+    $dash = htmlspecialchars($base . '/public/dashboard/', ENT_QUOTES, 'UTF-8');
+    $oper = htmlspecialchars($base . '/public/operator/', ENT_QUOTES, 'UTF-8');
+    echo '<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IUCCS · 접속 선택</title>
+<style>
+  :root{--bg:#0A111E;--surface:#152439;--surface2:#0b1626;--line:#24384F;--navy:#1F3A5F;--steel:#2E5A88;
+    --ink:#EAF2FC;--text:#C4D4E7;--muted:#7C90A8;--amber:#E8A33D;--amberD:#C9871B;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:radial-gradient(1100px 650px at 50% -8%, #16283f 0%, #0A111E 60%);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+  .wrap{width:100%;max-width:420px;text-align:center}
+  .logo{width:60px;height:60px;border-radius:16px;margin:0 auto 16px;background:linear-gradient(160deg,#2e5a88,#16273f);
+    display:flex;align-items:center;justify-content:center;font-size:28px}
+  h1{color:var(--ink);font-size:19px;font-weight:800;letter-spacing:-.01em}
+  .mono{font-family:"SF Mono",ui-monospace,Consolas,monospace}
+  .build{color:#F3D26B;font-weight:800;font-size:12px;margin-top:6px;letter-spacing:.02em}
+  .cards{display:flex;flex-direction:column;gap:14px;margin-top:32px}
+  a.card{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;padding:18px 20px;text-decoration:none;color:inherit;text-align:left;
+    transition:border-color .15s, transform .15s}
+  a.card:hover{border-color:var(--steel);transform:translateY(-1px)}
+  a.card .ic{width:46px;height:46px;border-radius:12px;background:var(--surface2);display:flex;align-items:center;
+    justify-content:center;font-size:22px;flex:none}
+  a.card .lbl{color:var(--ink);font-weight:800;font-size:16px}
+  a.card .sub{color:var(--muted);font-size:12.5px;margin-top:2px}
+  a.card.admin .ic{background:rgba(232,163,61,.15)}
+  a.card.operator .ic{background:rgba(59,130,214,.15)}
+  .foot{margin-top:28px;color:var(--muted);font-size:11.5px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">🛰️</div>
+    <h1>통합무인전투 통제체계</h1>
+    <div class="build mono">[시범운용]</div>
+    <div class="cards">
+      <a class="card admin" href="' . $dash . '">
+        <div class="ic">🖥️</div>
+        <div><div class="lbl">관리자</div><div class="sub">관제 대시보드 · 임무 지시 · COP</div></div>
+      </a>
+      <a class="card operator" href="' . $oper . '">
+        <div class="ic">📡</div>
+        <div><div class="lbl">조종자</div><div class="sub">현장 운용자 앱 · 임무 수신 · 보고</div></div>
+      </a>
+    </div>
+    <div class="foot">역할에 맞는 항목을 선택해 접속하세요</div>
+  </div>
+</body>
+</html>';
     exit;
 }
 
