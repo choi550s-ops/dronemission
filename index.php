@@ -93,7 +93,7 @@ function route($path, $method)
                FROM iuccs_teams WHERE lat IS NOT NULL ORDER BY team_no"
         )->fetchAll();
         $reports = $pdo->query(
-            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, created_at
+            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, hostile, note, created_at
                FROM iuccs_reports WHERE lat IS NOT NULL ORDER BY created_at DESC LIMIT 50"
         )->fetchAll();
         $fires = $pdo->query(
@@ -170,7 +170,7 @@ function route($path, $method)
         $missions = $pdo->query("SELECT * FROM iuccs_missions ORDER BY issued_at DESC LIMIT 100")->fetchAll();
         $reps = $pdo->query(
             "SELECT id, mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles,
-                    armed, unarmed, kia, serious, minor, failed, acknowledged, created_at
+                    armed, unarmed, kia, serious, minor, failed, hostile, acknowledged, created_at
                FROM iuccs_reports WHERE mission_id IS NOT NULL ORDER BY created_at DESC"
         )->fetchAll();
         $byM = array();
@@ -244,8 +244,8 @@ function route($path, $method)
         $st  = $pdo->prepare(
             "INSERT INTO iuccs_reports
                 (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles,
-                 armed, unarmed, scale, kia, serious, minor, failed, note)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                 armed, unarmed, scale, kia, serious, minor, failed, note, hostile)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'mission_id'), pval($b, 'team_id', $s['team_id']), $kind,
@@ -254,7 +254,7 @@ function route($path, $method)
             pval($b, 'troops'), pval($b, 'trucks'), pval($b, 'vehicles'),
             pval($b, 'armed'), pval($b, 'unarmed'), pval($b, 'scale'),
             pval($b, 'kia'), pval($b, 'serious'), pval($b, 'minor'),
-            pval($b, 'failed') ? 1 : 0, pval($b, 'note'),
+            pval($b, 'failed') ? 1 : 0, pval($b, 'note'), pval($b, 'hostile') ? 1 : 0,
         ));
         $id = $pdo->lastInsertId();
         log_activity('team#' . pval($s, 'team_id', '?'), 'report_submit', 'report', $id, $kind);

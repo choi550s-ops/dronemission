@@ -9,78 +9,107 @@
     --navy:#1F3A5F;--steel:#2E5A88;--ink:#EAF2FC;--text:#C4D4E7;--muted:#7C90A8;--amber:#E8A33D;--amberD:#C9871B;
     --red:#E24A3B;--yellow:#E1A800;--green:#2FA35A;--blue:#3B82D6;}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Noto Sans KR",sans-serif;min-height:100vh}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Noto Sans KR",sans-serif;
+    display:flex;flex-direction:column;min-height:100vh}
   .mono{font-family:"SF Mono",ui-monospace,Consolas,monospace}
-  header{padding:14px 22px;background:linear-gradient(180deg,#15243a,#111e31);border-bottom:1px solid var(--line);
-    display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
-  header .title{font-weight:800;color:var(--ink);font-size:18px}
-  header .build{font-size:11px;color:var(--muted)}
+  header{flex:none;padding:11px 20px;background:linear-gradient(180deg,#15243a,#111e31);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:12px;z-index:10}
+  header .title{font-weight:800;color:var(--ink);font-size:17px}
+  header .build{font-size:11.5px;color:#F3D26B;font-weight:800;letter-spacing:.02em}
   header .clk{margin-left:auto;font-size:14px;color:#AFC3DA}
   .modeb{font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px}
   .mode-real{background:rgba(226,74,59,.16);color:#FF8579;border:1px solid rgba(226,74,59,.5)}
-  .wrap{max-width:1360px;margin:0 auto;padding:18px 22px 60px}
-  .counts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px}
-  .stat{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:16px 18px}
-  .stat .n{font-size:34px;font-weight:800;color:var(--ink)}
-  .stat .l{font-size:13px;color:var(--muted);margin-top:2px}
-  .grid{display:grid;grid-template-columns:2fr 1fr;gap:16px}
-  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px}
-  h2{color:var(--ink);font-size:15px;margin-bottom:12px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:10px 16px;display:flex;align-items:baseline;gap:10px}
+  .stat .n{font-size:24px;font-weight:800;color:var(--ink)}
+  .stat .l{font-size:12px;color:var(--muted)}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+  h2{color:var(--ink);font-size:14.5px;margin-bottom:10px}
   table{width:100%;border-collapse:collapse}
-  th,td{text-align:left;padding:9px 8px;font-size:13px;border-bottom:1px solid var(--line)}
-  th{color:var(--muted);font-weight:700;font-size:12px}
-  .dot{width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:7px}
+  th,td{text-align:left;padding:8px 7px;font-size:12.5px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:700;font-size:11.5px;position:sticky;top:0;background:var(--surface)}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block;vertical-align:middle;margin-right:6px}
   .chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .badge{font-size:11px;font-weight:800;padding:3px 9px;border-radius:6px}
   .btn{border:none;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
   .btn-amber{background:linear-gradient(180deg,var(--amber),var(--amberD));color:#1a1206}
   .btn-ghost{background:transparent;border:1px solid var(--steel);color:#CFE0F0}
-  select,input{background:var(--surface2);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:8px;font-size:13px;font-family:inherit}
+  select,input{background:var(--surface2);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:7px 8px;font-size:12.5px;font-family:inherit;width:100%}
   .muted{color:var(--muted)}
+  .between{display:flex;align-items:center;justify-content:space-between}
   /* login overlay */
   #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
-  #login .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;width:340px;display:flex;flex-direction:column;gap:14px}
+  #login .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px;width:min(340px,92vw);display:flex;flex-direction:column;gap:14px}
   #login input{padding:12px;font-size:15px}
   #login .lbl{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700;margin-bottom:6px}
   .warn{background:rgba(232,163,61,.1);border:1px solid rgba(232,163,61,.35);color:#f3c882;font-size:12px;padding:9px;border-radius:9px}
-  .mapcard{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:18px}
-  .maphd{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-  #map{height:440px;border-radius:10px;border:1px solid var(--line);background:#0b1626;z-index:1}
-  .routemap{height:210px;border-radius:10px;border:1px solid var(--line);margin-top:8px;background:#0b1626;z-index:1}
-  .mcoords{font-size:12px;color:var(--text);margin-top:8px;max-height:90px;overflow:auto;line-height:1.6}
-  .mcoords .mono{color:#cfe0f0}
-  .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#1a1206;font-weight:800;font-size:11px;padding:0}
-  .wp:before,.wp:after{display:none!important}
-  #drawbtn.on-draw{background:linear-gradient(180deg,#E8A33D,#C9871B);color:#1a1206;border-color:transparent}
-  .bcard{border:1px solid var(--line);border-radius:11px;padding:11px 13px;background:var(--surface2)}
-  .bcard.attack{border-color:rgba(226,74,59,.4)}
-  .brep{border-top:1px dashed var(--line);margin-top:8px;padding-top:8px;font-size:12.5px}
-  .brep-row{display:flex;justify-content:space-between;gap:10px;padding:4px 0}
-  .brep-empty{color:var(--muted);font-size:12px;padding:6px 0}
-  .lyr{font-size:12px;font-weight:700;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);cursor:pointer;user-select:none}
-  .lyr.on{background:var(--navy);color:#fff;border-color:var(--steel)}
-  .leg{display:flex;gap:13px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:10px}
+
+  /* ---------- one-screen desktop layout ---------- */
+  .wrap{flex:1;display:flex;flex-direction:column;gap:10px;padding:12px 16px;overflow:hidden;min-height:0}
+  .stripbar{flex:none;display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .opgrid{flex:1;display:grid;grid-template-columns:280px 1fr 320px;gap:10px;min-height:0}
+  .col{min-height:0;display:flex;flex-direction:column}
+  .colLeft{overflow-y:auto}
+  .colCenter{overflow:hidden;display:flex;flex-direction:column}
+  .colRight{overflow-y:auto;gap:10px}
+  .bottomrow{flex:none;height:220px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .bottomrow .card{overflow-y:auto;height:100%;display:flex;flex-direction:column}
+  .bottomrow .card .scrollbody{overflow-y:auto;flex:1;min-height:0}
+  .mapcard{display:flex;flex-direction:column;flex:1;min-height:0}
+  .maphd{flex:none;display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+  #map{flex:1;min-height:0;border-radius:10px;border:1px solid var(--line);background:#0b1626;z-index:1}
+  .leg{flex:none;display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px}
   .leg span{display:inline-flex;align-items:center;gap:5px}
   .leg i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .leg i.diamond-leg{border-radius:0;transform:rotate(45deg);width:8px;height:8px}
+
+  .mcoords{font-size:11.5px;color:var(--text);margin-top:6px;max-height:70px;overflow:auto;line-height:1.55}
+  .mcoords .mono{color:#cfe0f0}
+  .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#12222f;font-weight:800;font-size:10.5px;padding:0}
+  .wp:before,.wp:after{display:none!important}
+  #drawbtn.on-draw{background:linear-gradient(180deg,#E8A33D,#C9871B);color:#1a1206;border-color:transparent}
+  .bcard{border:1px solid var(--line);border-radius:11px;padding:9px 12px;background:var(--surface2)}
+  .bcard.attack{border-color:rgba(226,74,59,.4)}
+  .brep{border-top:1px dashed var(--line);margin-top:7px;padding-top:7px;font-size:12px}
+  .brep-row{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+  .brep-empty{color:var(--muted);font-size:11.5px;padding:5px 0}
+  .lyr{font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);cursor:pointer;user-select:none}
+  .lyr.on{background:var(--navy);color:#fff;border-color:var(--steel)}
+
+  .teamlabel{background:rgba(11,22,38,.88)!important;color:#fff!important;border:1px solid rgba(255,255,255,.18)!important;
+    box-shadow:none!important;padding:1px 7px!important;border-radius:5px!important;font-size:11px!important;font-weight:800!important}
+  .teamlabel:before{display:none!important}
+  .diamond-icon{background:transparent!important;border:none!important}
+  .diamond{width:13px;height:13px;background:#E24A3B;border:2px solid #0b1626;transform:rotate(45deg);box-shadow:0 0 4px rgba(226,74,59,.7)}
+  .hovertip{font-size:12px;line-height:1.5}
+
   .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#16273f;color:#dce8f5;border:1px solid #2e5a88}
   .leaflet-popup-content{font-size:12.5px;margin:9px 11px;line-height:1.5}
+  .leaflet-tooltip{background:#16273f;color:#dce8f5;border:1px solid #2e5a88;box-shadow:none}
+  .leaflet-tooltip-top:before{border-top-color:#2e5a88}
   .leaflet-container{font-family:inherit;background:#0b1626}
   .leaflet-bar a{background:#16273f;color:#cfe0f0;border-color:#2e5a88}
-  .leaflet-control-attribution{background:rgba(11,22,38,.7)!important;color:#6b7a8c!important}
+  .leaflet-control-attribution{background:rgba(11,22,38,.7)!important;color:#6b7a8c!important;font-size:10px!important}
   .leaflet-control-attribution a{color:#8fa4bd!important}
-  #login .box{width:min(340px,92vw)}
-  /* ---------- tablet / phone ---------- */
+
+  /* ---------- tablet / phone: revert to stacked, scrollable page ---------- */
   @media(max-width:900px){
-    .wrap{max-width:100%;padding:14px 12px 52px}
-    .grid{grid-template-columns:1fr}
-    .counts{grid-template-columns:repeat(3,1fr);gap:9px}
-    .stat{padding:12px}
-    .stat .n{font-size:26px}
-    .stat .l{font-size:11px}
-    #map{height:330px}
-    header{padding:12px 14px}
-    header .title{font-size:15px}
-    .mapcard,.card{padding:13px}
-    /* tables become stacked cards */
+    body{display:block;height:auto}
+    .wrap{display:block;height:auto;overflow:visible;padding:14px 12px 52px}
+    .stripbar{grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}
+    .stat{padding:10px 12px}
+    .stat .n{font-size:22px}
+    .opgrid{display:block}
+    .col,.colLeft,.colCenter,.colRight{overflow:visible;display:block;height:auto}
+    .colRight .card{margin-bottom:12px}
+    .mapcard{display:block;margin-bottom:12px}
+    #map{height:300px}
+    .bottomrow{display:block;height:auto}
+    .bottomrow .card{height:auto;margin-bottom:12px;overflow:visible}
+    .bottomrow .card .scrollbody{overflow:visible}
+    header{padding:11px 14px}
+    header .title{font-size:14.5px}
+    .card{padding:12px}
     table thead{display:none}
     table,tbody,tr,td{display:block;width:100%}
     tbody tr{border:1px solid var(--line);border-radius:11px;padding:7px 12px;margin-bottom:9px;background:var(--surface2)}
@@ -89,10 +118,7 @@
     tbody td:empty{display:none}
   }
   @media(max-width:480px){
-    header .build{display:none}
-    .counts .stat .n{font-size:21px}
-    .counts .stat .l{font-size:10px}
-    #map{height:270px}
+    #map{height:250px}
     .maphd h2{font-size:13px}
     .lyr{padding:5px 9px;font-size:11px}
   }
@@ -114,75 +140,83 @@
 
 <header>
   <span class="title">통합무인전투 통제체계</span>
-  <span class="build">[건설운용]</span>
+  <span class="build">[시범운용]</span>
   <span class="modeb mode-real" id="mode">실제</span>
   <span class="clk mono" id="clk">--:--:--</span>
 </header>
 
 <div class="wrap" id="wrap" style="display:none">
-  <div class="counts" id="counts"></div>
+  <div class="stripbar" id="counts"></div>
 
-  <div class="mapcard">
-    <div class="maphd">
-      <h2 style="margin:0">공통작전상황도 (COP)</h2>
-      <span id="drawhint" style="display:none;margin-left:12px;font-size:12px;font-weight:700;color:#F3C070">● 경로 그리기 중 — 지도를 클릭</span>
-      <div style="display:flex;gap:6px;margin-left:auto">
-        <span class="lyr on" data-layer="teams" onclick="toggleLayer(this)">팀</span>
-        <span class="lyr on" data-layer="reports" onclick="toggleLayer(this)">정찰</span>
-        <span class="lyr on" data-layer="fires" onclick="toggleLayer(this)">화력요청</span>
-      </div>
-    </div>
-    <div id="map"></div>
-    <div class="leg">
-      <span><i style="background:#E24A3B"></i>운용불가</span>
-      <span><i style="background:#E1A800"></i>준비중</span>
-      <span><i style="background:#2FA35A"></i>준비완료</span>
-      <span><i style="background:#3B82D6"></i>임무중</span>
-      <span><i style="background:#E8A33D"></i>정찰 결과</span>
-      <span><i style="background:#ff5b5b"></i>화력요청</span>
-    </div>
-  </div>
-
-  <div class="grid">
-    <div class="card">
+  <div class="opgrid">
+    <div class="col colLeft card">
       <h2>팀 · 자산 현황</h2>
-      <table><thead><tr><th>팀</th><th>상태</th><th>좌표</th><th>기체</th><th>최근 접속</th></tr></thead>
+      <table><thead><tr><th>팀</th><th>상태</th><th>좌표</th><th>기체</th></tr></thead>
         <tbody id="teams"></tbody></table>
     </div>
-    <div style="display:flex;flex-direction:column;gap:16px">
+
+    <div class="col colCenter mapcard">
+      <div class="maphd">
+        <h2 style="margin:0">공통작전상황도 (COP)</h2>
+        <span id="drawhint" style="display:none;margin-left:10px;font-size:11.5px;font-weight:700;color:#F3C070">● 경로 그리기 중 — 지도를 클릭</span>
+        <div style="display:flex;gap:6px;margin-left:auto">
+          <span class="lyr on" data-layer="teams" onclick="toggleLayer(this)">팀</span>
+          <span class="lyr on" data-layer="reports" onclick="toggleLayer(this)">정찰</span>
+          <span class="lyr on" data-layer="fires" onclick="toggleLayer(this)">화력요청</span>
+        </div>
+      </div>
+      <div id="map"></div>
+      <div class="leg">
+        <span><i style="background:#E24A3B"></i>테두리: 운용불가</span>
+        <span><i style="background:#E1A800"></i>준비중</span>
+        <span><i style="background:#2FA35A"></i>준비완료</span>
+        <span><i style="background:#3B82D6"></i>임무중</span>
+        <span><i class="diamond-leg" style="background:#E24A3B"></i>적 식별 보고</span>
+        <span><i style="background:#E8A33D"></i>정찰 결과</span>
+        <span><i style="background:#ff5b5b"></i>화력요청</span>
+        <span class="muted">· 채움색 = 팀 고유색</span>
+      </div>
+    </div>
+
+    <div class="col colRight" style="display:flex;flex-direction:column;gap:10px">
       <div class="card">
         <h2>임무 지시</h2>
-        <div style="display:flex;flex-direction:column;gap:9px">
-          <select id="m_team"></select>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <select id="m_team" onchange="redrawRoute()"></select>
           <select id="m_type" onchange="onTypeChange()"><option value="recon">정찰</option><option value="attack">공격</option></select>
           <input id="m_coord" class="mono" placeholder="군사좌표 자동 (지도 지정 시)">
           <input id="m_route" placeholder="비고/방식 (예: 자율 / 표적지정)">
-          <button class="btn btn-ghost" id="drawbtn" style="padding:9px" onclick="toggleDraw()">✎ 지도에서 경로 그리기</button>
-          <div class="mcoords" id="m_coords"><span class="muted">‘경로 그리기’를 켜고 위 COP 지도를 클릭하세요</span></div>
+          <button class="btn btn-ghost" id="drawbtn" style="padding:8px" onclick="toggleDraw()">✎ 지도에서 경로 그리기</button>
+          <div class="mcoords" id="m_coords"><span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span></div>
           <div style="display:flex;gap:6px">
-            <button class="btn btn-ghost" style="padding:9px;flex:1" onclick="clearRoute()">경로 초기화</button>
-            <button class="btn btn-amber" style="padding:11px;flex:2" onclick="issueMission()">임무 하달</button>
+            <button class="btn btn-ghost" style="padding:8px;flex:1" onclick="clearRoute()">초기화</button>
+            <button class="btn btn-amber" style="padding:10px;flex:2" onclick="issueMission()">임무 하달</button>
           </div>
-          <div class="muted" style="font-size:11.5px">※ 공격 임무는 승인·ROE 확인 후 하달됩니다.</div>
+          <div class="muted" style="font-size:11px">※ 공격 임무는 승인·ROE 확인 후 하달됩니다.</div>
         </div>
       </div>
-      <div class="card">
+      <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
         <h2>화력협조 요청</h2>
-        <div id="fires" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div id="fires" style="display:flex;flex-direction:column;gap:7px;overflow-y:auto"></div>
       </div>
     </div>
   </div>
-  <div class="card" style="margin-top:16px">
-    <div class="between" style="margin-bottom:2px">
-      <h2 style="margin:0">임무 지시 현황판</h2>
-      <span class="muted" style="font-size:11.5px">임무별 하달 정보와 수신된 결과 보고를 함께 표시</span>
+
+  <div class="bottomrow">
+    <div class="card">
+      <div class="between" style="margin-bottom:2px;flex:none">
+        <h2 style="margin:0">임무 지시 현황판</h2>
+        <span class="muted" style="font-size:11px">하달 정보 + 결과 보고 연동</span>
+      </div>
+      <div class="scrollbody" id="board" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
     </div>
-    <div id="board" style="display:flex;flex-direction:column;gap:9px;margin-top:10px"></div>
-  </div>
-  <div class="card" style="margin-top:16px">
-    <h2>최근 보고 (전체)</h2>
-    <table><thead><tr><th>시각</th><th>팀</th><th>종류</th><th>모드</th><th>내용</th><th></th></tr></thead>
-      <tbody id="reports"></tbody></table>
+    <div class="card">
+      <h2 style="flex:none">최근 보고 (전체)</h2>
+      <div class="scrollbody">
+        <table><thead><tr><th>시각</th><th>팀</th><th>종류</th><th>모드</th><th>내용</th><th></th></tr></thead>
+          <tbody id="reports"></tbody></table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -201,6 +235,11 @@ function toMGRS(lat,lng){
 }
 function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
 
+// ---- per-team color ----
+const TEAMPAL=['#4FC3F7','#FF8A65','#AED581','#BA68C8','#4DD0E1','#FFD54F','#F06292','#90A4AE'];
+function teamColorForNo(no){ const n=parseInt(no,10); const idx=isNaN(n)?0:Math.abs(n-1)%TEAMPAL.length; return TEAMPAL[idx]; }
+let TEAMNO={}, TEAMCOLORS={};
+
 async function api(path,method='GET',body=null){
   const h={'Content-Type':'application/json'}; if(TOKEN)h['Authorization']='Bearer '+TOKEN;
   const r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):null});
@@ -210,7 +249,7 @@ async function login(){
   try{
     const r=await api('/login','POST',{login_id:document.getElementById('l_id').value.trim(),password:document.getElementById('l_pw').value});
     TOKEN=r.token; ROLE=r.role; sessionStorage.setItem('iuccs_dash_token',TOKEN);
-    document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='block';
+    document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='flex';
     startClock(); loadAll(); setInterval(loadAll,10000);
   }catch(e){ document.getElementById('l_err').style.display='block'; }
 }
@@ -218,15 +257,17 @@ function startClock(){setInterval(()=>document.getElementById('clk').textContent
 
 async function loadAll(){ await Promise.all([loadDash(),loadFires(),loadReports(),loadMap(),loadBoard()]); }
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
+
 async function loadBoard(){
   try{
     const d=await api('/missions/board');
     const ms=(d.missions||[]).slice(0,15);
     document.getElementById('board').innerHTML = ms.length ? ms.map(function(m){
       const atk=m.type==='attack';
+      const teamNo=TEAMNO[m.team_id]||m.team_id;
       const reps=m.reports||[];
       const repsHtml = reps.length ? reps.map(function(r){
-        const c = r.kind==='recon' ? `병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}`
+        const c = r.kind==='recon' ? `병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}${r.hostile==1?' · 🔺적식별':''}`
                 : `무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}${r.failed==1?' · 실패':''}`;
         return `<div class="brep-row"><span>${esc(String(r.created_at)).slice(5,16)} · ${esc(coordText(r.lat,r.lng,r.coord))}</span>
           <span style="text-align:right">${esc(c)} ${r.acknowledged==1?'<span class="muted">(확인)</span>':`<button class="btn btn-ghost" style="padding:3px 9px;font-size:11px" onclick="ackReport(${r.id})">확인</button>`}</span></div>`;
@@ -234,8 +275,8 @@ async function loadBoard(){
       return `<div class="bcard ${atk?'attack':''}">
         <div class="between">
           <span><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span>
-            <span style="margin-left:8px;font-weight:700">${esc(m.team_id)}팀</span>
-            <span class="mono muted" style="margin-left:8px;font-size:12px">${esc(coordText(m.lat,m.lng,m.coord))}</span></span>
+            <span style="margin-left:8px;font-weight:700;color:${esc(TEAMCOLORS[m.team_id]||'#cfe0f0')}">${esc(teamNo)}팀</span>
+            <span class="mono muted" style="margin-left:8px;font-size:11.5px">${esc(coordText(m.lat,m.lng,m.coord))}</span></span>
           <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></div>
         <div class="brep">${repsHtml}</div></div>`;
     }).join('') : '<div class="muted" style="font-size:12.5px">지시된 임무가 없습니다.</div>';
@@ -258,89 +299,112 @@ function toggleLayer(el){
   const k=el.dataset.layer; layerOn[k]=!layerOn[k]; el.classList.toggle('on');
   const g=LG[k]; if(!g)return; if(layerOn[k]) g.addTo(MAP); else MAP.removeLayer(g);
 }
-function mk(lat,lng,color,r){return L.circleMarker([lat,lng],{radius:r||8,color:'#0b1626',weight:2,fillColor:color,fillOpacity:0.95});}
+function diamondIcon(){
+  return L.divIcon({className:'diamond-icon',html:'<div class="diamond"></div>',iconSize:[14,14],iconAnchor:[7,7]});
+}
 async function loadMap(){
   initMap(); if(!MAP) return;
   try{
     const d=await api('/map');
+    (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); });
     LG.teams.clearLayers(); LG.reports.clearLayers(); LG.fires.clearLayers();
     const pts=[];
     (d.teams||[]).forEach(function(t){
-      const c=STATUSCOL[t.status]||'#7C90A8';
-      mk(+t.lat,+t.lng,c,9).bindPopup('<b>'+esc(t.team_no)+'팀</b><br>'+(STATUS[t.status]?STATUS[t.status][0]:esc(t.status))+'<br><span style="font-family:monospace">'+esc(coordText(t.lat,t.lng,t.coord))+'</span>').addTo(LG.teams);
+      const border=STATUSCOL[t.status]||'#7C90A8';
+      const fill=teamColorForNo(t.team_no);
+      const m=L.circleMarker([+t.lat,+t.lng],{radius:10,weight:3,color:border,fillColor:fill,fillOpacity:0.95});
+      m.bindPopup('<b>'+esc(t.team_no)+'팀</b><br>'+(STATUS[t.status]?STATUS[t.status][0]:esc(t.status))+'<br><span style="font-family:monospace">'+esc(coordText(t.lat,t.lng,t.coord))+'</span>');
+      m.bindTooltip(esc(t.team_no)+'팀',{permanent:true,direction:'right',offset:[11,0],className:'teamlabel'});
+      m.addTo(LG.teams);
       pts.push([+t.lat,+t.lng]);
     });
     (d.reports||[]).forEach(function(r){
-      mk(+r.lat,+r.lng,'#E8A33D',6).bindPopup('<b>정찰 보고</b> ('+esc(r.team_id)+'팀)<br>병력 '+(r.troops||0)+' · 트럭 '+(r.trucks||0)+'<br><span style="font-family:monospace">'+esc(coordText(r.lat,r.lng,r.coord))+'</span>').addTo(LG.reports);
+      const teamNo=TEAMNO[r.team_id]||r.team_id;
+      const targetInfo = r.kind==='recon' ? `병력 ${r.troops||0} · 트럭 ${r.trucks||0} · 차량 ${r.vehicles||0}` : (r.note||'');
+      const tipHtml = '<div class="hovertip"><b>'+esc(teamNo)+'팀 보고</b>'+(r.hostile==1?' · <span style="color:#ff8579">🔺 적 식별</span>':'')+'<br>'+esc(targetInfo)+'</div>';
+      let m;
+      if(r.hostile==1){ m=L.marker([+r.lat,+r.lng],{icon:diamondIcon()}); }
+      else { m=L.circleMarker([+r.lat,+r.lng],{radius:6,weight:2,color:'#0b1626',fillColor:'#E8A33D',fillOpacity:0.95}); }
+      m.bindTooltip(tipHtml,{direction:'top',sticky:true,className:'hovertip'});
+      m.bindPopup('<b>정찰 보고</b> ('+esc(teamNo)+'팀)<br>'+esc(targetInfo)+'<br><span style="font-family:monospace">'+esc(coordText(r.lat,r.lng,r.coord))+'</span>');
+      m.addTo(LG.reports);
       pts.push([+r.lat,+r.lng]);
     });
     (d.fire_requests||[]).forEach(function(f){
-      mk(+f.lat,+f.lng,'#ff5b5b',7).bindPopup('<b>🔺 화력요청</b><br>'+esc(f.target||'')+' · '+(FSTAT[f.status]||f.status)+'<br><span style="font-family:monospace">'+esc(coordText(f.lat,f.lng,f.coord))+'</span>').addTo(LG.fires);
+      const teamNo=TEAMNO[f.team_id]||f.team_id;
+      const m=L.circleMarker([+f.lat,+f.lng],{radius:7,weight:2,color:'#0b1626',fillColor:'#ff5b5b',fillOpacity:0.95});
+      m.bindTooltip('<div class="hovertip"><b>'+esc(teamNo)+'팀 화력요청</b><br>'+esc(f.target||'')+' · '+(FSTAT[f.status]||f.status)+'</div>',{direction:'top',sticky:true});
+      m.bindPopup('<b>🔺 화력요청</b> ('+esc(teamNo)+'팀)<br>'+esc(f.target||'')+' · '+(FSTAT[f.status]||f.status)+'<br><span style="font-family:monospace">'+esc(coordText(f.lat,f.lng,f.coord))+'</span>');
+      m.addTo(LG.fires);
       pts.push([+f.lat,+f.lng]);
     });
-    if(pts.length){ try{ MAP.fitBounds(pts,{padding:[40,40],maxZoom:15}); }catch(e){} }
+    if(pts.length){ try{ MAP.fitBounds(pts,{padding:[30,30],maxZoom:15}); }catch(e){} }
   }catch(e){}
 }
 
-// ---- mission route drawing (on the main COP map) ----
+// ---- mission route drawing (on the main COP map, colored by selected team) ----
 let ROUTE=[], MLINE=null, MMARK=[], DRAW=false;
 function toggleDraw(){
   DRAW=!DRAW;
   document.getElementById('drawbtn').classList.toggle('on-draw',DRAW);
   document.getElementById('drawbtn').innerHTML = DRAW ? '■ 경로 그리기 중지' : '✎ 지도에서 경로 그리기';
   document.getElementById('drawhint').style.display = DRAW ? 'inline' : 'none';
-  if(DRAW && MAP){ try{ MAP.scrollIntoView&&MAP.scrollIntoView(); }catch(e){} }
 }
 function onTypeChange(){ clearRoute(); }
+function currentRouteColor(){
+  const id=+document.getElementById('m_team').value;
+  return TEAMCOLORS[id]||'#E8A33D';
+}
 function addRoutePoint(lat,lng){
   const type=document.getElementById('m_type').value;
   if(type==='attack'){ ROUTE=[[lat,lng]]; } else { ROUTE.push([lat,lng]); }
   redrawRoute();
 }
 function redrawRoute(){
-  if(!MAP)return;
+  if(!MAP||!MLINE)return;
+  const color=currentRouteColor();
   MMARK.forEach(function(m){LG.route.removeLayer(m);}); MMARK=[];
   ROUTE.forEach(function(p,i){
-    const m=L.circleMarker(p,{radius:9,color:'#0b1626',weight:2,fillColor:'#E8A33D',fillOpacity:.95})
+    const m=L.circleMarker(p,{radius:9,color:'#0b1626',weight:2,fillColor:color,fillOpacity:.95})
       .bindTooltip(String(i+1),{permanent:true,direction:'center',className:'wp'});
     LG.route.addLayer(m); MMARK.push(m);
   });
-  MLINE.setLatLngs(ROUTE);
+  MLINE.setLatLngs(ROUTE); MLINE.setStyle({color:color});
   const el=document.getElementById('m_coords');
   el.innerHTML = ROUTE.length ? ROUTE.map(function(p,i){return '<div>'+(i+1)+') <span class="mono">'+esc(toMGRS(p[0],p[1])||'')+'</span></div>';}).join('')
-    : '<span class="muted">‘경로 그리기’를 켜고 위 COP 지도를 클릭하세요</span>';
+    : '<span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span>';
 }
 function clearRoute(){
   MMARK.forEach(function(m){ if(LG.route) LG.route.removeLayer(m); }); MMARK=[]; ROUTE=[];
   if(MLINE) MLINE.setLatLngs([]);
-  const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">‘경로 그리기’를 켜고 위 COP 지도를 클릭하세요</span>';
+  const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span>';
 }
 
 async function loadDash(){
   try{
     const d=await api('/dashboard');
+    (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); });
     document.getElementById('counts').innerHTML=`
       <div class="stat"><div class="n">${d.counts.missions_pending}</div><div class="l">대기 임무</div></div>
       <div class="stat"><div class="n">${d.counts.reports_unack}</div><div class="l">미확인 보고</div></div>
       <div class="stat"><div class="n">${d.counts.fire_pending}</div><div class="l">화력요청 대기</div></div>`;
     document.getElementById('teams').innerHTML=(d.teams||[]).map(t=>{
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
-      return `<tr><td class="mono" data-label="팀">${esc(t.team_no)}팀</td>
+      return `<tr><td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
-        <td class="mono" data-label="좌표">${esc(coordText(t.lat,t.lng,t.coord))}</td><td data-label="기체">${t.drone_count}</td>
-        <td class="muted mono" data-label="최근 접속" style="font-size:11px">${t.last_login_at?esc(t.last_login_at).slice(5,16):'-'}</td></tr>`;}).join('');
+        <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordText(t.lat,t.lng,t.coord))}</td><td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
     const sel=document.getElementById('m_team');
-    if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; }
+    if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; redrawRoute(); }
   }catch(e){ if(e.error==='unauthorized') logout(); }
 }
 async function loadFires(){
-  try{ const d=await api('/fire-requests'); const arr=(d.fire_requests||[]).slice(0,6);
+  try{ const d=await api('/fire-requests'); const arr=(d.fire_requests||[]).slice(0,8);
     document.getElementById('fires').innerHTML=arr.length?arr.map(f=>`
-      <div style="border:1px solid var(--line);border-radius:9px;padding:9px 10px">
+      <div style="border:1px solid var(--line);border-radius:9px;padding:8px 10px">
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-size:12.5px">${esc(f.target||'표적')} · <span class="mono">${esc(f.coord||'-')}</span></span>
+          <span style="font-size:12px"><span style="color:${teamColorForNo(TEAMNO[f.team_id]||'')};font-weight:700">${esc(TEAMNO[f.team_id]||f.team_id)}팀</span> · ${esc(f.target||'표적')} · <span class="mono">${esc(coordText(f.lat,f.lng,f.coord))}</span></span>
           <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${FSTAT[f.status]||f.status}</span></div>
-        ${(ROLE==='admin'||ROLE==='fire_coord')?`<div style="margin-top:7px;display:flex;gap:6px">
+        ${(ROLE==='admin'||ROLE==='fire_coord')?`<div style="margin-top:6px;display:flex;gap:6px">
           <button class="btn btn-ghost" onclick="fstat(${f.id},'approved')">승인</button>
           <button class="btn btn-ghost" onclick="fstat(${f.id},'held')">보류</button>
           <button class="btn btn-ghost" onclick="fstat(${f.id},'executed')">시행</button></div>`:''}
@@ -350,19 +414,20 @@ async function loadFires(){
 async function fstat(id,status){ try{ await api('/fire-requests/status','POST',{id,status}); loadFires(); }catch(e){alert('권한이 없거나 실패했습니다.');} }
 
 async function loadReports(){
-  try{ const d=await api('/reports'); const rs=(d.reports||[]).slice(0,12);
+  try{ const d=await api('/reports'); const rs=(d.reports||[]).slice(0,20);
     document.getElementById('reports').innerHTML=rs.length?rs.map(r=>{
-      let c=r.kind==='recon'?`병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}`
+      let c=r.kind==='recon'?`병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}${r.hostile==1?' · 🔺적식별':''}`
         :`무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}`;
+      const teamNo=TEAMNO[r.team_id]||r.team_id;
       return `<tr><td class="muted mono" data-label="시각" style="font-size:11px">${esc(String(r.created_at)).slice(5,16)}</td>
-        <td data-label="팀">${esc(r.team_id)}</td><td data-label="종류">${r.kind==='recon'?'정찰':(r.kind==='attack'?'공격':'사진')}</td>
+        <td data-label="팀" style="color:${teamColorForNo(teamNo)};font-weight:700">${esc(teamNo)}팀</td><td data-label="종류">${r.kind==='recon'?'정찰':(r.kind==='attack'?'공격':'사진')}</td>
         <td data-label="모드"><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
-        <td data-label="내용" style="font-size:12.5px">${esc(c)}</td>
+        <td data-label="내용" style="font-size:12px">${esc(c)}</td>
         <td data-label="처리">${r.acknowledged==1?'<span class="muted">확인</span>':`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`}</td></tr>`;}).join('')
       :'<tr><td colspan="6" class="muted">보고 없음</td></tr>';
   }catch(e){}
 }
-async function ackReport(id){ try{ await api('/reports/ack','POST',{id}); loadReports(); loadDash(); }catch(e){alert('실패');} }
+async function ackReport(id){ try{ await api('/reports/ack','POST',{id}); loadReports(); loadDash(); loadBoard(); }catch(e){alert('실패');} }
 
 async function issueMission(){
   const body={team_id:document.getElementById('m_team').value,type:document.getElementById('m_type').value,
@@ -380,7 +445,7 @@ async function issueMission(){
 function logout(){ sessionStorage.removeItem('iuccs_dash_token'); location.reload(); }
 
 // auto-enter if token present
-if(TOKEN){ document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='block'; startClock(); loadAll(); setInterval(loadAll,10000); }
+if(TOKEN){ document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='flex'; startClock(); loadAll(); setInterval(loadAll,10000); }
 </script>
 </body>
 </html>

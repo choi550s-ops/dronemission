@@ -63,8 +63,14 @@
   .geo b{color:var(--ink);font-family:"SF Mono",monospace}
   .rcoords{font-size:12px;color:var(--text);margin-top:7px;line-height:1.6}
   .rcoords .mono{color:#cfe0f0}
-  .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#1a1206;font-weight:800;font-size:11px;padding:0}
+  .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#12222f;font-weight:800;font-size:11px;padding:0}
   .wp:before,.wp:after{display:none!important}
+  .teamlabel{background:rgba(11,22,38,.88)!important;color:#fff!important;border:1px solid rgba(255,255,255,.18)!important;
+    box-shadow:none!important;padding:1px 7px!important;border-radius:5px!important;font-size:10.5px!important;font-weight:800!important}
+  .teamlabel:before{display:none!important}
+  .diamond-icon{background:transparent!important;border:none!important}
+  .diamond{width:12px;height:12px;background:#E24A3B;border:2px solid #0b1626;transform:rotate(45deg);box-shadow:0 0 4px rgba(226,74,59,.7)}
+  .leaflet-tooltip{background:#16273f;color:#dce8f5;border:1px solid #2e5a88;font-size:11.5px}
   .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:#16273f;color:#dce8f5;border:1px solid #2e5a88}
   .leaflet-popup-content{font-size:12px;margin:8px 10px;line-height:1.5}
   .leaflet-container{font-family:inherit;background:#0b1626}
@@ -143,6 +149,8 @@ function toMGRS(lat,lng){
   }catch(e){ return null; }
 }
 function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
+const TEAMPAL=['#4FC3F7','#FF8A65','#AED581','#BA68C8','#4DD0E1','#FFD54F','#F06292','#90A4AE'];
+function teamColorForNo(no){ const n=parseInt(no,10); const idx=isNaN(n)?0:Math.abs(n-1)%TEAMPAL.length; return TEAMPAL[idx]; }
 const COMM={good:'양호',weak:'미약',lost:'두절'}, GPS={fixed:'고정',searching:'탐색',none:'없음'};
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
 const FSTAT={received:'접수',reviewing:'검토',approved:'승인',held:'보류',executed:'시행',rejected:'반려'};
@@ -207,19 +215,36 @@ function mountPicker(elId,onSet){
   setTimeout(function(){map.invalidateSize();},250);
   return map;
 }
+function diamondIcon(){ return L.divIcon({className:'diamond-icon',html:'<div class="diamond"></div>',iconSize:[13,13],iconAnchor:[6,6]}); }
 async function homeMap(){
   if(typeof L==='undefined'||!document.getElementById('home_map'))return;
   const map=L.map('home_map',{zoomControl:false,attributionControl:false}).setView([37.555,127.01],12);
   darkTiles(map);
   try{
     const d=await api('/map'); const pts=[];
+    const teamNoOf={}; (d.teams||[]).forEach(function(t){ teamNoOf[t.id]=t.team_no; });
     (d.teams||[]).forEach(function(t){
-      const col=TCOL[t.status]||'#7C90A8';
-      L.circleMarker([+t.lat,+t.lng],{radius:8,color:'#0b1626',weight:2,fillColor:col,fillOpacity:.95}).bindPopup(esc(t.team_no)+'팀').addTo(map);
+      const border=TCOL[t.status]||'#7C90A8';
+      const fill=teamColorForNo(t.team_no);
+      const m=L.circleMarker([+t.lat,+t.lng],{radius:8,weight:3,color:border,fillColor:fill,fillOpacity:.95});
+      m.bindTooltip(esc(t.team_no)+'팀',{permanent:true,direction:'right',offset:[9,0],className:'teamlabel'});
+      m.addTo(map);
       pts.push([+t.lat,+t.lng]);
     });
+    (d.reports||[]).forEach(function(r){
+      const teamNo=teamNoOf[r.team_id]||r.team_id;
+      const info = r.kind==='recon' ? `병력 ${r.troops||0} · 트럭 ${r.trucks||0} · 차량 ${r.vehicles||0}` : (r.note||'');
+      const tip='<b>'+esc(teamNo)+'팀 보고</b>'+(r.hostile==1?' · <span style="color:#ff8579">🔺적 식별</span>':'')+'<br>'+esc(info);
+      let m;
+      if(r.hostile==1){ m=L.marker([+r.lat,+r.lng],{icon:diamondIcon()}); }
+      else { m=L.circleMarker([+r.lat,+r.lng],{radius:5,weight:2,color:'#0b1626',fillColor:'#E8A33D',fillOpacity:.95}); }
+      m.bindTooltip(tip,{direction:'top',sticky:true}).addTo(map);
+      pts.push([+r.lat,+r.lng]);
+    });
     (d.fire_requests||[]).forEach(function(f){
-      L.circleMarker([+f.lat,+f.lng],{radius:6,color:'#0b1626',weight:2,fillColor:'#ff5b5b',fillOpacity:.95}).addTo(map);
+      const teamNo=teamNoOf[f.team_id]||f.team_id;
+      L.circleMarker([+f.lat,+f.lng],{radius:6,weight:2,color:'#0b1626',fillColor:'#ff5b5b',fillOpacity:.95})
+        .bindTooltip('<b>'+esc(teamNo)+'팀 화력요청</b><br>'+esc(f.target||''),{direction:'top',sticky:true}).addTo(map);
       pts.push([+f.lat,+f.lng]);
     });
     if(pts.length)map.fitBounds(pts,{padding:[28,28],maxZoom:14});
@@ -354,9 +379,10 @@ function mountRouteMap(elId,pts){
   if(typeof L==='undefined'||!document.getElementById(elId))return;
   const map=L.map(elId,{zoomControl:true}).setView(pts[0],14);
   darkTiles(map);
-  if(pts.length>1) L.polyline(pts,{color:'#E8A33D',weight:3,dashArray:'6,7'}).addTo(map);
+  const color=teamColorForNo(SESS.team_no);
+  if(pts.length>1) L.polyline(pts,{color:color,weight:3,dashArray:'6,7'}).addTo(map);
   pts.forEach(function(p,i){
-    L.circleMarker(p,{radius:8,color:'#0b1626',weight:2,fillColor:'#E8A33D',fillOpacity:.95})
+    L.circleMarker(p,{radius:8,color:'#0b1626',weight:2,fillColor:color,fillOpacity:.95})
       .bindTooltip(String(i+1),{permanent:true,direction:'center',className:'wp'}).addTo(map);
   });
   try{ map.fitBounds(pts,{padding:[24,24],maxZoom:15}); }catch(e){}
@@ -392,7 +418,9 @@ function numRow(id,label){return `<div class="between" style="padding:7px 0"><sp
 function rfields(){
   const el=document.getElementById('rfields');
   if(RKIND==='recon'){
-    el.innerHTML=`<div class="card">${numRow('r_troops','병력')}${numRow('r_trucks','트럭')}${numRow('r_vehicles','일반차량')}</div>`;
+    el.innerHTML=`<div class="card">${numRow('r_troops','병력')}${numRow('r_trucks','트럭')}${numRow('r_vehicles','일반차량')}
+      <label class="row" style="margin-top:9px;font-size:13px;padding-top:9px;border-top:1px dashed var(--line)">
+        <input type="checkbox" id="r_hostile" style="width:18px;height:18px;flex:none"> 🔺 적 식별 (지도에 적색 마름모로 표시)</label></div>`;
   }else{
     el.innerHTML=`<div class="card">${numRow('r_armed','무장')}${numRow('r_unarmed','비무장')}
       <div class="lbl" style="margin:10px 0 6px">피해 판정</div>
@@ -404,7 +432,7 @@ async function submitReport(){
   const g=id=>{const e=document.getElementById(id);return e?e.value:null;};
   const body={team_id:SESS.team_id,kind:RKIND,mode:MODE,coord:g('r_coord')};
   const rla=g('r_lat'), rln=g('r_lng'); if(rla){body.lat=+rla;} if(rln){body.lng=+rln;}
-  if(RKIND==='recon'){Object.assign(body,{troops:+g('r_troops'),trucks:+g('r_trucks'),vehicles:+g('r_vehicles')});}
+  if(RKIND==='recon'){Object.assign(body,{troops:+g('r_troops'),trucks:+g('r_trucks'),vehicles:+g('r_vehicles'),hostile:document.getElementById('r_hostile').checked?1:0});}
   else{Object.assign(body,{armed:+g('r_armed'),unarmed:+g('r_unarmed'),kia:+g('r_kia'),serious:+g('r_serious'),minor:+g('r_minor'),failed:document.getElementById('r_failed').checked?1:0});}
   try{ await api('/reports','POST',body); toast('보고 전송됨'); renderReport(); }catch(e){ toast('전송 실패'); }
 }
