@@ -278,6 +278,15 @@ function respTag(m){
   if(t==='delay') return '<span class="resp-chip resp-delay">⏱ 준비시간 '+(m.response_delay_min||0)+'분'+(m.response_reason?' (사유: '+esc(m.response_reason)+')':'')+'</span>';
   return '<span class="resp-chip resp-none">⏳ 미응답</span>';
 }
+async function approveMission(id){
+  const cb=document.getElementById('roe_'+id);
+  if(!cb||!cb.checked){ alert('교전규칙(ROE) 확인 체크가 필요합니다.'); return; }
+  try{
+    await api('/missions/approve','POST',{id,roe_confirmed:1});
+    alert('승인됨 — 공격 임무가 하달되었습니다.');
+    loadBoard(); loadDash(); loadMap();
+  }catch(e){ alert(e.error==='roe_required'?'ROE 확인이 필요합니다.':'승인 실패 (관리자 권한이 필요합니다).'); }
+}
 async function loadBoard(){
   try{
     const d=await api('/missions/board');
@@ -292,6 +301,13 @@ async function loadBoard(){
         return `<div class="brep-row"><span>${esc(String(r.created_at)).slice(5,16)} · ${esc(coordText(r.lat,r.lng,r.coord))}</span>
           <span style="text-align:right">${esc(c)} ${r.acknowledged==1?'<span class="muted">(확인)</span>':`<button class="btn btn-ghost" style="padding:3px 9px;font-size:11px" onclick="ackReport(${r.id})">확인</button>`}</span></div>`;
       }).join('') : '<div class="brep-empty">아직 결과 보고 없음</div>';
+      const approveBlock = (atk && m.status==='pending_approval' && ROLE==='admin') ? `
+        <div class="warn" style="margin-top:8px">
+          <label style="display:flex;align-items:center;gap:7px;font-size:12px;margin-bottom:8px;cursor:pointer">
+            <input type="checkbox" id="roe_${m.id}" style="width:16px;height:16px;flex:none"> 교전규칙(ROE) 확인함
+          </label>
+          <button class="btn btn-amber" style="padding:7px 14px;font-size:12px" onclick="approveMission(${m.id})">승인 및 하달</button>
+        </div>` : '';
       return `<div class="bcard ${atk?'attack':''}">
         <div class="between">
           <span><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span>
@@ -299,6 +315,7 @@ async function loadBoard(){
             <span class="mono muted" style="margin-left:8px;font-size:11.5px">${esc(coordText(m.lat,m.lng,m.coord))}</span></span>
           <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span></div>
         <div style="margin-top:6px">${respTag(m)}</div>
+        ${approveBlock}
         <div class="brep">${repsHtml}</div></div>`;
     }).join('') : '<div class="muted" style="font-size:12.5px">지시된 임무가 없습니다.</div>';
   }catch(e){}
