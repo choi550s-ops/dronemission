@@ -235,7 +235,7 @@
 
 <script>
 const API=location.pathname.replace(/\/public\/.*$/,'')+'/api';
-let TOKEN=sessionStorage.getItem('iuccs_dash_token')||null, ROLE=null;
+let TOKEN=sessionStorage.getItem('iuccs_dash_token')||null, ROLE=sessionStorage.getItem('iuccs_dash_role')||null;
 const STATUS={unavailable:['적색·운용불가','var(--red)'],preparing:['황색·준비중','var(--yellow)'],
   ready:['녹색·준비완료','var(--green)'],on_mission:['청색·임무중','var(--blue)']};
 const FSTAT={received:'접수',reviewing:'검토',approved:'승인',held:'보류',executed:'시행',rejected:'반려'};
@@ -261,7 +261,7 @@ async function api(path,method='GET',body=null){
 async function login(){
   try{
     const r=await api('/login','POST',{login_id:document.getElementById('l_id').value.trim(),password:document.getElementById('l_pw').value});
-    TOKEN=r.token; ROLE=r.role; sessionStorage.setItem('iuccs_dash_token',TOKEN);
+    TOKEN=r.token; ROLE=r.role; sessionStorage.setItem('iuccs_dash_token',TOKEN); sessionStorage.setItem('iuccs_dash_role',ROLE);
     document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='flex';
     startClock(); loadAll(); setInterval(loadAll,10000);
   }catch(e){ document.getElementById('l_err').style.display='block'; }
@@ -512,10 +512,17 @@ async function issueMission(){
     loadDash(); loadMap(); loadBoard();
   }catch(e){ alert(e.error==='forbidden'?'권한이 없습니다 (관리자/팀장).':'하달 실패'); }
 }
-function logout(){ sessionStorage.removeItem('iuccs_dash_token'); location.reload(); }
+function logout(){ sessionStorage.removeItem('iuccs_dash_token'); sessionStorage.removeItem('iuccs_dash_role'); location.reload(); }
 
 // auto-enter if token present
-if(TOKEN){ document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='flex'; startClock(); loadAll(); setInterval(loadAll,10000); }
+if(TOKEN){
+  document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='flex';
+  startClock(); setInterval(loadAll,10000);
+  if(!ROLE){
+    api('/session').then(function(s){ ROLE=s.role; sessionStorage.setItem('iuccs_dash_role',ROLE); loadAll(); })
+      .catch(function(){ loadAll(); });
+  } else { loadAll(); }
+}
 </script>
 </body>
 </html>
