@@ -231,10 +231,12 @@
     <div class="card">
       <div class="between" style="margin-bottom:2px;flex:none">
         <h2 style="margin:0">임무 지시 현황판</h2>
-        <span class="muted" style="font-size:11px">하달 정보 + 현장 응답 + 결과 보고 연동</span>
+        <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer">
+          <input type="checkbox" id="chk_show_cancelled" onchange="loadBoard()" style="width:13px;height:13px"> 취소된 임무 표시
+        </label>
       </div>
       <div class="scrollbody">
-        <table><thead><tr><th>유형</th><th>팀</th><th>좌표</th><th>상태</th><th>현장 응답</th><th>최근 보고</th></tr></thead>
+        <table><thead><tr><th>유형</th><th>팀</th><th>좌표</th><th>거리</th><th>상태</th><th>현장 응답</th><th>최근 보고</th><th></th></tr></thead>
           <tbody id="board"></tbody></table>
       </div>
     </div>
@@ -268,6 +270,35 @@ function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallbac
 // ---- per-team color ----
 const TEAMPAL=['#56B4E9','#E69F00','#009E73','#CC79A7','#D55E00','#0072B2','#B0BEC5','#F0E442'];
 function teamColorForNo(no){ const n=parseInt(no,10); const idx=isNaN(n)?0:Math.abs(n-1)%TEAMPAL.length; return TEAMPAL[idx]; }
+let TEAMLATLNG={};
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000, toRad=function(d){return d*Math.PI/180;};
+  const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function fmtDist(m){
+  if(m==null||isNaN(m)) return '-';
+  return m>=1000 ? (m/1000).toFixed(1)+'km' : Math.round(m)+'m';
+}
+function routeTotalDist(pts){
+  if(!pts||pts.length<2) return 0;
+  let t=0; for(let i=1;i<pts.length;i++){ t+=haversine(pts[i-1][0],pts[i-1][1],pts[i][0],pts[i][1]); }
+  return t;
+}
+function missionDistanceLabel(m){
+  const base=TEAMLATLNG[m.team_id];
+  let pts=null; if(m.route_points){ try{ pts=JSON.parse(m.route_points); }catch(e){} }
+  if(m.type==='attack'){
+    let target=null;
+    if(pts&&pts.length) target=pts[0];
+    else if(m.lat!=null&&m.lng!=null) target=[+m.lat,+m.lng];
+    if(!base||!target) return '<span class="muted">-</span>';
+    return '직선 '+fmtDist(haversine(base[0],base[1],target[0],target[1]));
+  }
+  if(!pts||pts.length<2) return '<span class="muted">-</span>';
+  return '경로 '+fmtDist(routeTotalDist(pts));
+}
 let TEAMNO={}, TEAMCOLORS={};
 
 async function api(path,method='GET',body=null){
@@ -295,6 +326,14 @@ function respTag(m){
   if(t==='delay') return '<span class="resp-chip resp-delay">⏱ 준비시간 '+(m.response_delay_min||0)+'분'+(m.response_reason?' (사유: '+esc(m.response_reason)+')':'')+'</span>';
   return '<span class="resp-chip resp-none">⏳ 미응답</span>';
 }
+async function cancelMission(id){
+  if(!confirm('이 임무를 취소하시겠습니까?\n(삭제되지 않고 "취소됨" 상태로 비활성화되며, 필요 시 필터 체크박스로 다시 볼 수 있습니다.)')) return;
+  try{
+    await api('/missions/cancel','POST',{id});
+    toast('임무가 취소(비활성화)되었습니다.');
+    loadBoard(); loadDash(); loadMap();
+  }catch(e){ alert('취소 실패 (관리자 권한이 필요합니다).'); }
+}
 async function approveMission(id){
   const cb=document.getElementById('roe_'+id);
   if(!cb||!cb.checked){ alert('교전규칙(ROE) 확인 체크가 필요합니다.'); return; }
@@ -307,7 +346,10 @@ async function approveMission(id){
 async function loadBoard(){
   try{
     const d=await api('/missions/board');
-    const ms=(d.missions||[]).slice(0,20);
+    const showCancelled = document.getElementById('chk_show_cancelled') ? document.getElementById('chk_show_cancelled').checked : false;
+    let all=(d.missions||[]);
+    if(!showCancelled){ all = all.filter(function(m){ return m.status!=='cancelled'; }); }
+    const ms=all.slice(0,20);
     document.getElementById('board').innerHTML = ms.length ? ms.map(function(m){
       const atk=m.type==='attack';
       const teamNo=TEAMNO[m.team_id]||m.team_id;
@@ -331,15 +373,19 @@ async function loadBoard(){
         : (m.status==='cancelled'
           ? '<span class="chip" style="background:rgba(124,144,168,.18);color:var(--muted)">취소됨</span>'
           : `<span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span>`);
-      const rowStyle = m.status==='completed' ? ' style="opacity:.62"' : '';
+      const rowStyle = (m.status==='completed'||m.status==='cancelled') ? ' style="opacity:.6"' : '';
+      const canCancel = ROLE==='admin' && m.status!=='completed' && m.status!=='cancelled';
+      const cancelBtn = canCancel ? `<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="cancelMission(${m.id})">취소</button>` : '';
       return `<tr${rowStyle}>
         <td><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span></td>
         <td style="font-weight:700;color:${esc(TEAMCOLORS[m.team_id]||'#cfe0f0')}">${esc(teamNo)}팀</td>
         <td class="mono" style="font-size:11px">${esc(coordText(m.lat,m.lng,m.coord))}</td>
+        <td style="font-size:11px">${missionDistanceLabel(m)}</td>
         <td>${statusCell}</td>
         <td>${respCell}</td>
-        <td class="wrap-ok">${lastRepHtml}</td></tr>`;
-    }).join('') : '<tr><td colspan="6" class="muted">지시된 임무가 없습니다.</td></tr>';
+        <td class="wrap-ok">${lastRepHtml}</td>
+        <td>${cancelBtn}</td></tr>`;
+    }).join('') : '<tr><td colspan="8" class="muted">표시할 임무가 없습니다.</td></tr>';
   }catch(e){}
 }
 
@@ -381,7 +427,7 @@ async function loadMap(){
   initMap(); if(!MAP) return;
   try{
     const d=await api('/map');
-    (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); });
+    (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); if(t.lat!=null&&t.lng!=null) TEAMLATLNG[t.id]=[+t.lat,+t.lng]; });
     LG.teams.clearLayers(); LG.reports.clearLayers(); LG.fires.clearLayers(); LG.missionRoutes.clearLayers();
     TEAM_MARKERS={};
     const pts=[];
@@ -447,7 +493,7 @@ async function loadMap(){
 }
 
 // ---- mission route drawing (on the main COP map, colored by selected team) ----
-let ROUTE=[], MLINE=null, MMARK=[], DRAW=false;
+let ROUTE=[], MLINE=null, MMARK=[], DRAW=false, BASELINE=null;
 function toggleDraw(){
   DRAW=!DRAW;
   document.getElementById('drawbtn').classList.toggle('on-draw',DRAW);
@@ -467,27 +513,59 @@ function addRoutePoint(lat,lng){
 function redrawRoute(){
   if(!MAP||!MLINE)return;
   const color=currentRouteColor();
+  const teamId=+document.getElementById('m_team').value;
+  const base=TEAMLATLNG[teamId];
+  const type=document.getElementById('m_type').value;
   MMARK.forEach(function(m){LG.route.removeLayer(m);}); MMARK=[];
+  if(BASELINE){ LG.route.removeLayer(BASELINE); BASELINE=null; }
   ROUTE.forEach(function(p,i){
     const m=L.circleMarker(p,{radius:9,color:'#0b1626',weight:2,fillColor:color,fillOpacity:.95})
       .bindTooltip(String(i+1),{permanent:true,direction:'center',className:'wp'});
     LG.route.addLayer(m); MMARK.push(m);
   });
   MLINE.setLatLngs(ROUTE); MLINE.setStyle({color:color});
+  MLINE.unbindTooltip();
+
   const el=document.getElementById('m_coords');
-  el.innerHTML = ROUTE.length ? ROUTE.map(function(p,i){return '<div>'+(i+1)+') <span class="mono">'+esc(toMGRS(p[0],p[1])||'')+'</span></div>';}).join('')
+  const rows=[];
+  if(type==='attack'){
+    if(ROUTE.length){
+      const target=ROUTE[0];
+      let distTxt='';
+      if(base){
+        const d=haversine(base[0],base[1],target[0],target[1]);
+        distTxt=' · 직선거리 <b>'+fmtDist(d)+'</b>';
+        BASELINE=L.polyline([base,target],{color:color,weight:2,dashArray:'2,7',opacity:.75}).addTo(LG.route);
+        BASELINE.bindTooltip(fmtDist(d),{permanent:true,direction:'center',className:'wp',sticky:true});
+      }
+      rows.push('🎯 표적: <span class="mono">'+esc(toMGRS(target[0],target[1])||'')+'</span>'+distTxt);
+    }
+  } else {
+    const total=routeTotalDist(ROUTE);
+    ROUTE.forEach(function(p,i){
+      let seg='';
+      if(i>0){ const d=haversine(ROUTE[i-1][0],ROUTE[i-1][1],p[0],p[1]); seg=' · 구간 '+fmtDist(d); }
+      rows.push((i+1)+') <span class="mono">'+esc(toMGRS(p[0],p[1])||'')+'</span>'+seg);
+    });
+    if(ROUTE.length>1){
+      rows.push('<b>총 경로거리: '+fmtDist(total)+'</b>');
+      MLINE.bindTooltip('총 '+fmtDist(total),{permanent:true,direction:'center',className:'wp',sticky:true});
+    }
+  }
+  el.innerHTML = rows.length ? rows.map(function(r){return '<div>'+r+'</div>';}).join('')
     : '<span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span>';
 }
 function clearRoute(){
   MMARK.forEach(function(m){ if(LG.route) LG.route.removeLayer(m); }); MMARK=[]; ROUTE=[];
-  if(MLINE) MLINE.setLatLngs([]);
+  if(BASELINE){ LG.route.removeLayer(BASELINE); BASELINE=null; }
+  if(MLINE){ MLINE.setLatLngs([]); MLINE.unbindTooltip(); }
   const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span>';
 }
 
 async function loadDash(){
   try{
     const d=await api('/dashboard');
-    (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); });
+    (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); if(t.lat!=null&&t.lng!=null) TEAMLATLNG[t.id]=[+t.lat,+t.lng]; });
     document.getElementById('counts').innerHTML=`
       <div class="ministat"><span class="n">${d.counts.missions_pending}</span><span class="l">대기 임무</span></div>
       <div class="ministat"><span class="n">${d.counts.reports_unack}</span><span class="l">미확인 보고</span></div>

@@ -266,6 +266,15 @@ function route($path, $method)
         log_activity('team#' . pval($s, 'team_id', '?'), 'mission_complete', 'mission', $id, $note);
         json_out(array('ok' => true));
     }
+    if ($path === '/api/missions/cancel' && $method === 'POST') {
+        $s  = Auth::require_auth(array('admin'));
+        $b  = body_json();
+        $id = pval($b, 'id');
+        $pdo->prepare("UPDATE iuccs_missions SET status = 'cancelled' WHERE id = ? AND status NOT IN ('completed','cancelled')")
+            ->execute(array($id));
+        log_activity('user#' . $s['user_id'], 'mission_cancel', 'mission', $id, null);
+        json_out(array('ok' => true));
+    }
     if ($path === '/api/missions/approve' && $method === 'POST') {
         $s = Auth::require_auth(array('admin'));
         $b = body_json();
