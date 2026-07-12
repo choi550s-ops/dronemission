@@ -285,7 +285,7 @@
       </div>
       <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
         <div class="between" style="flex:none">
-          <h2 style="margin:0">화력협조 요청</h2>
+          <h2 style="margin:0">화력지원 요청</h2>
           <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_fires')">⤢ 펼쳐보기</button>
         </div>
         <div id="fires" style="display:flex;flex-direction:column;gap:7px;overflow-y:auto"></div>
@@ -342,7 +342,7 @@
 </div>
 <div id="modal_fires" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_fires')">
   <div class="modal-box">
-    <div class="modal-head"><h2 style="margin:0">화력협조 요청 — 전체보기</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_fires')">✕ 닫기</button></div>
+    <div class="modal-head"><h2 style="margin:0">화력지원 요청 — 전체보기</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_fires')">✕ 닫기</button></div>
     <div class="modal-body" id="fires_modal" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
 </div>
@@ -956,7 +956,7 @@ async function loadFires(){
       if(FIRST_POLL_DONE && maxId>SEEN_MAX_FIRE){
         const newest=arr.reduce(function(a,b){return a.id>b.id?a:b;});
         const tno=TEAMNO[newest.team_id]||newest.team_id;
-        notifyAlert('📡 화력협조 요청 — '+tno+'팀');
+        notifyAlert('📡 화력지원 요청 — '+tno+'팀');
       }
       SEEN_MAX_FIRE=Math.max(SEEN_MAX_FIRE,maxId);
     }
