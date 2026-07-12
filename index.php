@@ -170,13 +170,31 @@ function route($path, $method)
     if ($path === '/api/drones') {
         Auth::require_auth();
         $tid = pval($_GET, 'team_id');
+        $sql = "SELECT d.*, dm.name AS model_name, dm.category AS model_category
+                  FROM iuccs_drones d LEFT JOIN iuccs_drone_models dm ON dm.id = d.model_id";
         if ($tid) {
-            $st = $pdo->prepare("SELECT * FROM iuccs_drones WHERE team_id = ? ORDER BY code");
+            $st = $pdo->prepare($sql . " WHERE d.team_id = ? ORDER BY d.code");
             $st->execute(array($tid));
         } else {
-            $st = $pdo->query("SELECT * FROM iuccs_drones ORDER BY code");
+            $st = $pdo->query($sql . " ORDER BY d.code");
         }
         json_out(array('drones' => $st->fetchAll()));
+    }
+
+    if ($path === '/api/drone-models') {
+        Auth::require_auth();
+        json_out(array('models' => $pdo->query("SELECT * FROM iuccs_drone_models ORDER BY category, name")->fetchAll()));
+    }
+    if ($path === '/api/drone-models/create' && $method === 'POST') {
+        $s   = Auth::require_auth(array('admin'));
+        $b   = body_json();
+        $name = trim(pval($b, 'name', ''));
+        $cat  = (pval($b, 'category') === 'recon') ? 'recon' : 'attack';
+        if ($name === '') { json_out(array('error' => 'name_required'), 400); }
+        $st = $pdo->prepare("INSERT INTO iuccs_drone_models(name, category) VALUES (?,?)");
+        $st->execute(array($name, $cat));
+        log_activity('user#' . $s['user_id'], 'drone_model_create', 'drone_model', $pdo->lastInsertId(), $name);
+        json_out(array('id' => $pdo->lastInsertId()), 201);
     }
 
     if ($path === '/api/drones/update' && $method === 'POST') {
@@ -192,10 +210,10 @@ function route($path, $method)
         $enum = array(
             'comm_status' => array('good','weak','lost'),
             'gps_status'  => array('fixed','searching','none'),
-            'status'      => array('available','in_use','maintenance','down'),
+            'status'      => array('available','maintenance','destroyed'),
         );
         $sets = array(); $vals = array();
-        foreach (array('model','max_flight_min','battery_count','range_km','battery_pct','comm_status','gps_status','status') as $f) {
+        foreach (array('model_id','max_flight_min','battery_count','range_km','battery_pct','comm_status','gps_status','status') as $f) {
             if (!array_key_exists($f, $b)) { continue; }
             if (isset($enum[$f]) && !in_array($b[$f], $enum[$f], true)) { continue; }
             $sets[] = "$f = ?"; $vals[] = $b[$f];
@@ -214,15 +232,71 @@ function route($path, $method)
         if ($code === '') { json_out(array('error' => 'code_required'), 400); }
         try {
             $st = $pdo->prepare(
-                "INSERT INTO iuccs_drones(team_id, code, model, max_flight_min, battery_count, range_km, battery_pct, comm_status, gps_status, status)
+                "INSERT INTO iuccs_drones(team_id, code, model_id, max_flight_min, battery_count, range_km, battery_pct, comm_status, gps_status, status)
                  VALUES (?,?,?,?,?,?,?,'good','fixed','available')"
             );
-            $st->execute(array($team, $code, pval($b, 'model'), pval($b, 'max_flight_min'),
+            $st->execute(array($team, $code, pval($b, 'model_id'), pval($b, 'max_flight_min'),
                 pval($b, 'battery_count'), pval($b, 'range_km'), pval($b, 'battery_pct', 100)));
         } catch (Exception $e) {
             json_out(array('error' => 'duplicate_or_invalid'), 400);
         }
         json_out(array('id' => $pdo->lastInsertId()), 201);
+    }
+
+    if ($path === '/api/team-members') {
+        Auth::require_auth();
+        $tid = pval($_GET, 'team_id');
+        if ($tid) {
+            $st = $pdo->prepare("SELECT * FROM iuccs_team_members WHERE team_id = ? ORDER BY id");
+            $st->execute(array($tid));
+        } else {
+            $st = $pdo->query("SELECT * FROM iuccs_team_members ORDER BY team_id, id");
+        }
+        json_out(array('members' => $st->fetchAll()));
+    }
+    if ($path === '/api/team-members/create' && $method === 'POST') {
+        $s    = Auth::require_auth();
+        $b    = body_json();
+        $team = ($s['role'] === 'admin') ? pval($b, 'team_id', $s['team_id']) : $s['team_id'];
+        $name = trim(pval($b, 'name', ''));
+        $roles = array('공격','로봇','정찰','지원','통신','사이버');
+        $role = in_array(pval($b, 'role'), $roles, true) ? $b['role'] : '지원';
+        if ($name === '') { json_out(array('error' => 'name_required'), 400); }
+        $st = $pdo->prepare("INSERT INTO iuccs_team_members(team_id, name, role) VALUES (?,?,?)");
+        $st->execute(array($team, $name, $role));
+        json_out(array('id' => $pdo->lastInsertId()), 201);
+    }
+    if ($path === '/api/team-members/update' && $method === 'POST') {
+        $s  = Auth::require_auth();
+        $b  = body_json();
+        $id = pval($b, 'id');
+        if ($s['role'] !== 'admin') {
+            $chk = $pdo->prepare("SELECT team_id FROM iuccs_team_members WHERE id = ?");
+            $chk->execute(array($id));
+            $row = $chk->fetch();
+            if (!$row || $row['team_id'] != $s['team_id']) { json_out(array('error' => 'forbidden'), 403); }
+        }
+        $roles = array('공격','로봇','정찰','지원','통신','사이버');
+        $sets = array(); $vals = array();
+        if (array_key_exists('name', $b)) { $sets[] = 'name = ?'; $vals[] = trim($b['name']); }
+        if (array_key_exists('role', $b) && in_array($b['role'], $roles, true)) { $sets[] = 'role = ?'; $vals[] = $b['role']; }
+        if (!$sets) { json_out(array('error' => 'no_fields'), 400); }
+        $vals[] = $id;
+        $pdo->prepare("UPDATE iuccs_team_members SET " . implode(', ', $sets) . " WHERE id = ?")->execute($vals);
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/team-members/delete' && $method === 'POST') {
+        $s  = Auth::require_auth();
+        $b  = body_json();
+        $id = pval($b, 'id');
+        if ($s['role'] !== 'admin') {
+            $chk = $pdo->prepare("SELECT team_id FROM iuccs_team_members WHERE id = ?");
+            $chk->execute(array($id));
+            $row = $chk->fetch();
+            if (!$row || $row['team_id'] != $s['team_id']) { json_out(array('error' => 'forbidden'), 403); }
+        }
+        $pdo->prepare("DELETE FROM iuccs_team_members WHERE id = ?")->execute(array($id));
+        json_out(array('ok' => true));
     }
 
     if ($path === '/api/missions/board') {

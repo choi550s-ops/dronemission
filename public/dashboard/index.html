@@ -57,6 +57,8 @@
   .ministat .n{font-size:19px;font-weight:800;color:var(--ink)}
   .ministat .l{font-size:11px;color:var(--muted)}
   #teams tbody tr{cursor:pointer}
+  .expand-arrow{background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;padding:0 5px 0 0;line-height:1;vertical-align:middle}
+  .expand-arrow:hover{color:var(--ink)}
   #teams tbody tr:hover{background:rgba(255,255,255,.03)}
   .bottomrow{flex:none;height:220px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .bottomrow .card{overflow-y:auto;height:100%;display:flex;flex-direction:column}
@@ -628,6 +630,72 @@ function clearRoute(){
   const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span>';
 }
 
+// ---- team expand panel (roster) ----
+let TEAM_EXPANDED={}, EDITING_MEMBER_D=null;
+const ROLES_D=['공격','로봇','정찰','지원','통신','사이버'];
+function toggleTeamExpand(id){
+  TEAM_EXPANDED[id]=!TEAM_EXPANDED[id];
+  const row=document.getElementById('exprow_'+id);
+  if(row) row.style.display=TEAM_EXPANDED[id]?'table-row':'none';
+  const btn=document.querySelector(`[onclick="event.stopPropagation();toggleTeamExpand(${id})"]`);
+  if(btn) btn.textContent=TEAM_EXPANDED[id]?'▼':'▶';
+  if(TEAM_EXPANDED[id]) loadTeamDetail(id);
+}
+async function loadTeamDetail(id){
+  const el=document.getElementById('teamdetail_'+id);
+  if(!el) return;
+  el.innerHTML='<span class="muted" style="font-size:11px">불러오는 중…</span>';
+  try{
+    const d=await api('/team-members?team_id='+id);
+    const members=d.members||[];
+    el.innerHTML = `
+      <div class="lbl" style="margin-bottom:6px">팀원 현황</div>
+      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">
+        ${members.length?members.map(function(m){
+          if(EDITING_MEMBER_D===m.id){
+            return `<div style="display:flex;gap:5px;align-items:center">
+              <input id="dedit_name_${m.id}" value="${esc(m.name)}" style="flex:1;font-size:12px;padding:5px 8px">
+              <select id="dedit_role_${m.id}" style="flex:1;font-size:12px;padding:5px 8px">${ROLES_D.map(function(r){return `<option value="${r}" ${r===m.role?'selected':''}>${r}</option>`;}).join('')}</select>
+              <button class="btn btn-ghost" style="padding:4px 8px;font-size:10.5px" onclick="cancelEditMemberD(${id})">취소</button>
+              <button class="btn btn-amber" style="padding:4px 8px;font-size:10.5px" onclick="saveEditMemberD(${m.id},${id})">저장</button>
+            </div>`;
+          }
+          return `<div class="between" style="font-size:12px">
+            <span>${esc(m.name)} <span class="chip" style="background:var(--surface);color:var(--text);margin-left:4px">${esc(m.role)}</span></span>
+            <span style="display:flex;gap:5px">
+              <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="startEditMemberD(${m.id},${id})">수정</button>
+              <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="deleteMemberD(${m.id},${id})">삭제</button>
+            </span></div>`;
+        }).join('') : '<span class="muted" style="font-size:11.5px">등록된 팀원이 없습니다.</span>'}
+      </div>
+      <div style="display:flex;gap:5px">
+        <input id="dnm_name_${id}" placeholder="이름" style="flex:1;font-size:12px;padding:6px 8px">
+        <select id="dnm_role_${id}" style="flex:1;font-size:12px;padding:6px 8px">${ROLES_D.map(function(r){return `<option value="${r}">${r}</option>`;}).join('')}</select>
+        <button class="btn btn-amber" style="padding:6px 10px;font-size:11px" onclick="addMemberD(${id})">+ 추가</button>
+      </div>`;
+  }catch(e){ el.innerHTML='<span class="muted" style="font-size:11px">불러오기 실패</span>'; }
+}
+function startEditMemberD(mid,tid){ EDITING_MEMBER_D=mid; loadTeamDetail(tid); }
+function cancelEditMemberD(tid){ EDITING_MEMBER_D=null; loadTeamDetail(tid); }
+async function saveEditMemberD(mid,tid){
+  const name=document.getElementById('dedit_name_'+mid).value.trim();
+  const role=document.getElementById('dedit_role_'+mid).value;
+  if(!name){ toast('이름을 입력하세요'); return; }
+  try{ await api('/team-members/update','POST',{id:mid,name,role}); EDITING_MEMBER_D=null; loadTeamDetail(tid); }
+  catch(e){ toast('수정 실패'); }
+}
+async function deleteMemberD(mid,tid){
+  if(!confirm('이 팀원을 삭제하시겠습니까?')) return;
+  try{ await api('/team-members/delete','POST',{id:mid}); loadTeamDetail(tid); }catch(e){ toast('삭제 실패'); }
+}
+async function addMemberD(tid){
+  const name=document.getElementById('dnm_name_'+tid).value.trim();
+  const role=document.getElementById('dnm_role_'+tid).value;
+  if(!name){ toast('이름을 입력하세요'); return; }
+  try{ await api('/team-members/create','POST',{team_id:tid,name,role}); loadTeamDetail(tid); }
+  catch(e){ toast('추가 실패'); }
+}
+
 async function loadDash(){
   try{
     const d=await api('/dashboard');
@@ -639,9 +707,16 @@ async function loadDash(){
     document.getElementById('teams').innerHTML=(d.teams||[]).map(t=>{
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
       const coordTip=esc(coordText(t.lat,t.lng,t.coord));
-      return `<tr onclick="flashTeam(${t.id})" title="좌표: ${coordTip}"><td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">${esc(t.team_no)}팀</td>
+      const expanded=!!TEAM_EXPANDED[t.id];
+      return `<tr onclick="flashTeam(${t.id})" title="좌표: ${coordTip}">
+        <td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">
+          <button class="expand-arrow" onclick="event.stopPropagation();toggleTeamExpand(${t.id})">${expanded?'▼':'▶'}</button>${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
-        <td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
+        <td data-label="기체">${t.drone_count}</td></tr>
+        <tr id="exprow_${t.id}" style="display:${expanded?'table-row':'none'}"><td colspan="3" style="padding:0">
+          <div id="teamdetail_${t.id}" style="padding:9px 6px;background:var(--surface2);border-radius:0 0 8px 8px"></div>
+        </td></tr>`;}).join('');
+    Object.keys(TEAM_EXPANDED).forEach(function(id){ if(TEAM_EXPANDED[id]) loadTeamDetail(+id); });
     const sel=document.getElementById('m_team');
     if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; redrawRoute(); }
   }catch(e){ if(e.error==='unauthorized') logout(); }

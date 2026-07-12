@@ -121,7 +121,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab on" data-v="home"><span class="ic">🏠</span>홈</button>
     <button class="tab" data-v="missions"><span class="ic">🎯</span>임무</button>
-    <button class="tab" data-v="drones"><span class="ic">✈️</span>기체</button>
+    <button class="tab" data-v="drones"><span class="ic">👥</span>팀관리</button>
     <button class="tab" data-v="report"><span class="ic">📋</span>보고</button>
     <button class="tab" data-v="fire"><span class="ic">📡</span>화력</button>
     <button class="tab" data-v="alerts"><span class="ic">🔔</span>알림</button>
@@ -334,31 +334,106 @@ async function renderHome(){
   }catch(e){ v.innerHTML=err(e); }
 }
 
-// ---- DRONES (기체 현황 관리) ----
-const STATLBL={available:'가용',in_use:'임무중',maintenance:'정비중',down:'고장'};
+// ---- 팀관리 (팀원 + 기체 현황 관리) ----
+const STATLBL={available:'가용',maintenance:'정비',destroyed:'파괴'};
+const CATLBL={attack:'공격',recon:'정찰'};
+const ROLES=['공격','로봇','정찰','지원','통신','사이버'];
+let DRONE_MODELS=[];
+let EDITING_MEMBER=null;
 async function renderDrones(){
   const v=document.getElementById('view');
   v.innerHTML='<div class="muted">불러오는 중…</div>';
   try{
-    const d=await api('/drones?team_id='+(SESS.team_id||''));
-    const drones=d.drones||[];
-    v.innerHTML = `<h2>기체 현황 관리</h2>
+    const [dm, mm, dd] = await Promise.all([
+      DRONE_MODELS.length?Promise.resolve({models:DRONE_MODELS}):api('/drone-models'),
+      api('/team-members?team_id='+(SESS.team_id||'')),
+      api('/drones?team_id='+(SESS.team_id||'')),
+    ]);
+    DRONE_MODELS = dm.models||DRONE_MODELS;
+    const members=mm.members||[];
+    const drones=dd.drones||[];
+    v.innerHTML = `<h2>팀관리</h2>
+      <div class="lbl" style="margin-top:2px">팀원 현황</div>
+      <div id="memberlist" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
+      <div class="card">
+        <div class="lbl">팀원 추가</div>
+        <input id="nm_name" placeholder="이름" style="margin-bottom:8px">
+        <select id="nm_role" style="margin-bottom:8px">${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
+        <button class="btn btn-ghost" style="padding:9px" onclick="addMember()">+ 팀원 추가</button>
+      </div>
+      <div class="lbl" style="margin-top:14px">기체 현황</div>
       <div id="dronelist" style="display:flex;flex-direction:column;gap:10px">${drones.length?'':'<div class="card muted">배정된 기체가 없습니다.</div>'}</div>
       <div class="card" style="margin-top:4px">
         <div class="lbl">신규 기체 등록</div>
-        <input id="nd_code" placeholder="기체 코드 (예: D-09)" style="margin-bottom:8px">
-        <input id="nd_model" placeholder="모델명 (선택)" style="margin-bottom:8px">
+        <input id="nd_code" placeholder="기체 코드 (예: 1호기)" style="margin-bottom:8px">
+        <select id="nd_model" style="margin-bottom:8px">${modelOptions()}</select>
         <button class="btn btn-ghost" style="padding:10px" onclick="createDrone()">+ 기체 추가</button>
       </div>`;
-    const list=document.getElementById('dronelist');
-    list.innerHTML = drones.map(function(dr){ return droneCard(dr); }).join('');
+    renderMemberList(members);
+    document.getElementById('dronelist').innerHTML = drones.map(function(dr){ return droneCard(dr); }).join('');
   }catch(e){ v.innerHTML=err(e); }
+}
+function modelOptions(selId){
+  const groups={attack:[],recon:[]};
+  DRONE_MODELS.forEach(function(m){ (groups[m.category]||groups.attack).push(m); });
+  let html='';
+  ['attack','recon'].forEach(function(cat){
+    if(!groups[cat].length) return;
+    html += `<optgroup label="${CATLBL[cat]}">` + groups[cat].map(function(m){
+      return `<option value="${m.id}" ${(''+selId)===(''+m.id)?'selected':''}>${esc(m.name)}</option>`;
+    }).join('') + `</optgroup>`;
+  });
+  return html;
+}
+function renderMemberList(members){
+  const el=document.getElementById('memberlist');
+  if(!el) return;
+  el.innerHTML = members.length ? members.map(function(m){
+    if(EDITING_MEMBER===m.id){
+      return `<div class="card" style="padding:9px 10px">
+        <input id="edit_name_${m.id}" value="${esc(m.name)}" style="margin-bottom:6px">
+        <select id="edit_role_${m.id}" style="margin-bottom:6px">${ROLES.map(function(r){return `<option value="${r}" ${r===m.role?'selected':''}>${r}</option>`;}).join('')}</select>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost" style="flex:1;padding:6px;font-size:11px" onclick="cancelEditMember()">취소</button>
+          <button class="btn btn-amber" style="flex:1;padding:6px;font-size:11px" onclick="saveEditMember(${m.id})">저장</button>
+        </div></div>`;
+    }
+    return `<div class="card between" style="padding:8px 10px">
+      <span style="font-size:13px">${esc(m.name)} <span class="chip" style="background:var(--surface2);color:var(--text);margin-left:4px">${esc(m.role)}</span></span>
+      <span style="display:flex;gap:5px">
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10.5px" onclick="startEditMember(${m.id})">수정</button>
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10.5px" onclick="deleteMember(${m.id})">삭제</button>
+      </span></div>`;
+  }).join('') : '<div class="card muted">등록된 팀원이 없습니다.</div>';
+}
+function startEditMember(id){ EDITING_MEMBER=id; renderDrones(); }
+function cancelEditMember(){ EDITING_MEMBER=null; renderDrones(); }
+async function saveEditMember(id){
+  const name=document.getElementById('edit_name_'+id).value.trim();
+  const role=document.getElementById('edit_role_'+id).value;
+  if(!name){ toast('이름을 입력하세요'); return; }
+  try{ await api('/team-members/update','POST',{id,name,role}); EDITING_MEMBER=null; toast('수정됨'); renderDrones(); }
+  catch(e){ toast('수정 실패'); }
+}
+async function deleteMember(id){
+  if(!confirm('이 팀원을 삭제하시겠습니까?')) return;
+  try{ await api('/team-members/delete','POST',{id}); toast('삭제됨'); renderDrones(); }catch(e){ toast('삭제 실패'); }
+}
+async function addMember(){
+  const name=document.getElementById('nm_name').value.trim();
+  const role=document.getElementById('nm_role').value;
+  if(!name){ toast('이름을 입력하세요'); return; }
+  try{ await api('/team-members/create','POST',{team_id:SESS.team_id,name,role}); toast('팀원 추가됨'); renderDrones(); }
+  catch(e){ toast('추가 실패'); }
 }
 function droneCard(dr){
   const bp=dr.battery_pct??0;
+  const catTxt = dr.model_category ? ' · '+CATLBL[dr.model_category] : '';
   return `<div class="card" id="dc_${dr.id}">
     <div class="between" style="margin-bottom:9px"><span class="val">✈️ ${esc(dr.code)}</span>
-      <span class="muted" style="font-size:11.5px">${esc(dr.model||'')}</span></div>
+      <span class="muted" style="font-size:11.5px">${esc(dr.model_name||'')}${catTxt}</span></div>
+    <div class="lbl">모델</div>
+    <select id="dr_model_${dr.id}" style="margin-bottom:9px">${modelOptions(dr.model_id)}</select>
     <div class="lbl">배터리 (%)</div>
     <input type="number" min="0" max="100" id="dr_bp_${dr.id}" value="${bp}" style="margin-bottom:9px">
     <div class="lbl">통신 상태</div>
@@ -376,26 +451,25 @@ function droneCard(dr){
     <div class="lbl">운용 상태</div>
     <select id="dr_stat_${dr.id}" style="margin-bottom:10px">
       <option value="available" ${dr.status==='available'?'selected':''}>가용</option>
-      <option value="in_use" ${dr.status==='in_use'?'selected':''}>임무중</option>
-      <option value="maintenance" ${dr.status==='maintenance'?'selected':''}>정비중</option>
-      <option value="down" ${dr.status==='down'?'selected':''}>고장</option>
+      <option value="maintenance" ${dr.status==='maintenance'?'selected':''}>정비</option>
+      <option value="destroyed" ${dr.status==='destroyed'?'selected':''}>파괴</option>
     </select>
-    <button class="btn btn-amber" style="padding:10px" onclick="saveDrone(${dr.id})">상태 저장</button>
+    <button class="btn btn-amber" style="padding:10px" onclick="saveDrone(${dr.id})">저장</button>
   </div>`;
 }
 async function saveDrone(id){
   const g=k=>document.getElementById(k+'_'+id).value;
   try{
-    await api('/drones/update','POST',{id,battery_pct:+g('dr_bp'),comm_status:g('dr_comm'),gps_status:g('dr_gps'),status:g('dr_stat')});
-    toast('기체 상태 저장됨');
+    await api('/drones/update','POST',{id,model_id:+g('dr_model')||null,battery_pct:+g('dr_bp'),comm_status:g('dr_comm'),gps_status:g('dr_gps'),status:g('dr_stat')});
+    toast('기체 정보 저장됨');
   }catch(e){ toast('저장 실패'); }
 }
 async function createDrone(){
   const code=document.getElementById('nd_code').value.trim();
-  const model=document.getElementById('nd_model').value.trim();
+  const modelId=+document.getElementById('nd_model').value||null;
   if(!code){ toast('기체 코드를 입력하세요'); return; }
   try{
-    await api('/drones/create','POST',{team_id:SESS.team_id,code,model});
+    await api('/drones/create','POST',{team_id:SESS.team_id,code,model_id:modelId});
     toast('기체 추가됨'); renderDrones();
   }catch(e){ toast('추가 실패 (중복 코드일 수 있음)'); }
 }
