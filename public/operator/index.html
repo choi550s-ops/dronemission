@@ -245,23 +245,13 @@ function fillMgrsBoxes(lat,lng,prefix){
         e=document.getElementById(prefix+'_e'), n=document.getElementById(prefix+'_n');
   if(z)z.value=parts[0]; if(sq)sq.value=parts[1]; if(e)e.value=parts[2]; if(n)n.value=parts[3];
 }
-function mgrsPartsToLatLng(zb,sq,e,n){
-  try{
-    zb=(zb||'').trim().toUpperCase(); sq=(sq||'').trim().toUpperCase();
-    e=(e||'').trim(); n=(n||'').trim();
-    if(!zb||!sq||!e||!n) return null;
-    e=e.padStart(5,'0').slice(0,5); n=n.padStart(5,'0').slice(0,5);
-    const pt=mgrs.toPoint(zb+sq+e+n);
-    if(!pt||isNaN(pt[0])||isNaN(pt[1])) return null;
-    return [pt[1],pt[0]];
-  }catch(err){ return null; }
-}
-function fillMgrsBoxes(lat,lng,prefix){
-  const s=toMGRS(lat,lng); if(!s) return;
-  const parts=s.split(' '); if(parts.length!==4) return;
-  const z=document.getElementById(prefix+'_zone'), sq=document.getElementById(prefix+'_sq'),
-        e=document.getElementById(prefix+'_e'), n=document.getElementById(prefix+'_n');
-  if(z)z.value=parts[0]; if(sq)sq.value=parts[1]; if(e)e.value=parts[2]; if(n)n.value=parts[3];
+function toggleMgrsManual(prefix){
+  const wrap=document.getElementById(prefix+'_mgrs_wrap');
+  const btn=document.getElementById(prefix+'_mgrs_toggle');
+  if(!wrap) return;
+  const open=wrap.style.display!=='none';
+  wrap.style.display=open?'none':'block';
+  if(btn) btn.textContent=(open?'▸':'▾')+' 군사좌표 수동입력';
 }
 const TEAMPAL=['#56B4E9','#E69F00','#009E73','#CC79A7','#D55E00','#0072B2','#B0BEC5','#F0E442'];
 function haversine(lat1,lng1,lat2,lng2){
@@ -773,15 +763,18 @@ function renderReport(){
     <h2>결과 보고</h2>
     <div class="seg" id="rkind"><button data-k="recon" class="on">정찰</button><button data-k="attack">공격 / 피해</button></div>
     <div class="card">
-      <div class="lbl">식별 위치 — 군사좌표 입력 (또는 지도 탭)</div>
-      <div style="display:flex;gap:5px;margin-bottom:8px">
-        <input id="r_mgrs_zone" class="mono" placeholder="52S" style="width:22%;text-align:center">
-        <input id="r_mgrs_sq" class="mono" placeholder="CG" style="width:18%;text-align:center">
-        <input id="r_mgrs_e" class="mono" placeholder="12345" style="width:30%;text-align:center">
-        <input id="r_mgrs_n" class="mono" placeholder="67890" style="width:30%;text-align:center">
-      </div>
-      <button class="btn btn-ghost" style="padding:8px;margin-bottom:8px" onclick="applyManualMGRS_r()">↳ 좌표 적용</button>
+      <div class="lbl">식별 위치 — 지도를 탭하세요</div>
       <div id="r_map" class="pickmap"></div>
+      <button type="button" class="btn btn-ghost" id="r_mgrs_toggle" style="padding:8px;margin-top:8px;width:100%" onclick="toggleMgrsManual('r')">▸ 군사좌표 수동입력</button>
+      <div id="r_mgrs_wrap" style="display:none;margin-top:8px">
+        <div style="display:flex;gap:5px;margin-bottom:8px">
+          <input id="r_mgrs_zone" class="mono" placeholder="52S" style="width:22%;text-align:center">
+          <input id="r_mgrs_sq" class="mono" placeholder="CG" style="width:18%;text-align:center">
+          <input id="r_mgrs_e" class="mono" placeholder="12345" style="width:30%;text-align:center">
+          <input id="r_mgrs_n" class="mono" placeholder="67890" style="width:30%;text-align:center">
+        </div>
+        <button class="btn btn-ghost" style="padding:8px;width:100%" onclick="applyManualMGRS_r()">↳ 좌표 적용</button>
+      </div>
       <input type="hidden" id="r_lat"><input type="hidden" id="r_lng">
     </div>
     <div id="rfields"></div>
@@ -836,15 +829,18 @@ function renderFire(){
   v.innerHTML=`
     <h2>화력협조 요청</h2>
     <div class="card">
-      <div class="lbl">요청 위치 — 군사좌표 입력 (또는 지도 탭)</div>
-      <div style="display:flex;gap:5px;margin-bottom:8px">
-        <input id="f_mgrs_zone" class="mono" placeholder="52S" style="width:22%;text-align:center">
-        <input id="f_mgrs_sq" class="mono" placeholder="CG" style="width:18%;text-align:center">
-        <input id="f_mgrs_e" class="mono" placeholder="12345" style="width:30%;text-align:center">
-        <input id="f_mgrs_n" class="mono" placeholder="67890" style="width:30%;text-align:center">
-      </div>
-      <button class="btn btn-ghost" style="padding:8px;margin-bottom:8px" onclick="applyManualMGRS_f()">↳ 좌표 적용</button>
+      <div class="lbl">요청 위치 — 지도를 탭하세요</div>
       <div id="f_map" class="pickmap"></div>
+      <button type="button" class="btn btn-ghost" id="f_mgrs_toggle" style="padding:8px;margin-top:8px;width:100%" onclick="toggleMgrsManual('f')">▸ 군사좌표 수동입력</button>
+      <div id="f_mgrs_wrap" style="display:none;margin-top:8px">
+        <div style="display:flex;gap:5px;margin-bottom:8px">
+          <input id="f_mgrs_zone" class="mono" placeholder="52S" style="width:22%;text-align:center">
+          <input id="f_mgrs_sq" class="mono" placeholder="CG" style="width:18%;text-align:center">
+          <input id="f_mgrs_e" class="mono" placeholder="12345" style="width:30%;text-align:center">
+          <input id="f_mgrs_n" class="mono" placeholder="67890" style="width:30%;text-align:center">
+        </div>
+        <button class="btn btn-ghost" style="padding:8px;width:100%" onclick="applyManualMGRS_f()">↳ 좌표 적용</button>
+      </div>
       <input type="hidden" id="f_lat"><input type="hidden" id="f_lng">
     </div>
     <div class="card">
