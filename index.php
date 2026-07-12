@@ -313,6 +313,33 @@ function route($path, $method)
         json_out(array('ok' => true));
     }
 
+    if ($path === '/api/messages' && $method === 'GET') {
+        $s   = Auth::require_auth();
+        $tid = pval($_GET, 'team_id');
+        if ($s['role'] !== 'admin') { $tid = $s['team_id']; }
+        if ($tid) {
+            $st = $pdo->prepare("SELECT * FROM iuccs_messages WHERE team_id = ? ORDER BY created_at ASC LIMIT 100");
+            $st->execute(array($tid));
+        } else {
+            $st = $pdo->query("SELECT * FROM iuccs_messages ORDER BY created_at DESC LIMIT 50");
+        }
+        json_out(array('messages' => $st->fetchAll()));
+    }
+    if ($path === '/api/messages' && $method === 'POST') {
+        $s    = Auth::require_auth();
+        $b    = body_json();
+        $tid  = ($s['role'] === 'admin') ? pval($b, 'team_id') : $s['team_id'];
+        $body = trim(pval($b, 'body', ''));
+        if (!$tid || $body === '') { json_out(array('error' => 'invalid'), 400); }
+        $dir    = ($s['role'] === 'admin') ? 'to_team' : 'from_team';
+        $sender = ($s['role'] === 'admin') ? 'admin' : ('team#' . $tid);
+        $st = $pdo->prepare("INSERT INTO iuccs_messages(team_id, sender, direction, body) VALUES (?,?,?,?)");
+        $st->execute(array($tid, $sender, $dir, $body));
+        $id = $pdo->lastInsertId();
+        log_activity($sender, 'message_send', 'message', $id, safe_substr($body, 0, 80));
+        json_out(array('id' => $id), 201);
+    }
+
     if ($path === '/api/missions/board') {
         Auth::require_auth();
         $missions = $pdo->query("SELECT * FROM iuccs_missions ORDER BY issued_at DESC LIMIT 100")->fetchAll();

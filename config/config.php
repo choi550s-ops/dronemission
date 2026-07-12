@@ -23,6 +23,15 @@ if (!function_exists('random_token')) {
         return $s;
     }
 }
+if (!function_exists('safe_substr')) {
+    // multi-byte-safe truncate; falls back to plain substr if mbstring isn't available
+    function safe_substr($str, $start, $len) {
+        if (function_exists('mb_substr')) {
+            return mb_substr($str, $start, $len, 'UTF-8');
+        }
+        return substr($str, $start, $len);
+    }
+}
 if (!function_exists('hash_equals')) {
     // constant-time compare polyfill (PHP < 5.6)
     function hash_equals($known, $user) {
