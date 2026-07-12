@@ -88,6 +88,12 @@
   .roe-inline{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
   .roe-inline label{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text);cursor:pointer}
   .roe-inline input{width:14px;height:14px;flex:none;padding:0}
+  .team-drawer{position:fixed;top:0;right:0;bottom:0;width:min(600px,94vw);background:var(--surface);
+    border-left:1px solid var(--line);z-index:75;display:flex;flex-direction:column;
+    box-shadow:-24px 0 60px -20px rgba(0,0,0,.65);animation:drawerIn .22s ease-out}
+  @keyframes drawerIn{0%{transform:translateX(100%)}100%{transform:translateX(0)}}
+  .team-drawer-head{padding:15px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex:none}
+  .team-drawer-body{padding:16px 20px;overflow-y:auto;flex:1;min-height:0}
   .modal-overlay{position:fixed;inset:0;background:rgba(4,9,17,.72);z-index:70;display:flex;align-items:center;justify-content:center;padding:24px}
   .modal-box{background:var(--surface);border:1px solid var(--line);border-radius:14px;width:min(1200px,95vw);max-height:88vh;
     display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 60px -20px rgba(0,0,0,.6)}
@@ -167,6 +173,9 @@
     .modal-overlay{padding:8px}
     .modal-head{padding:10px 12px}
     .modal-body{padding:10px 12px}
+    .team-drawer{width:100vw}
+    .team-drawer-head{padding:12px 14px}
+    .team-drawer-body{padding:12px 14px}
   }
 </style>
 <link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
@@ -326,6 +335,14 @@
   </div>
 </div>
 
+<div id="teamDrawer" class="team-drawer" style="display:none">
+  <div class="team-drawer-head">
+    <h2 id="td_title" style="margin:0">팀 상세</h2>
+    <button class="btn btn-ghost" onclick="closeTeamDrawer()">✕ 닫기</button>
+  </div>
+  <div class="team-drawer-body" id="td_body"></div>
+</div>
+
 <div id="modal_message" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_message')">
   <div class="modal-box" style="width:min(460px,92vw);max-height:80vh">
     <div class="modal-head"><h2 id="msg_modal_title" style="margin:0">메시지</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_message')">✕ 닫기</button></div>
@@ -405,7 +422,12 @@ async function login(){
     startClock(); loadAll(); setInterval(loadAll,10000); ensureNotifyPermission();
   }catch(e){ document.getElementById('l_err').style.display='block'; }
 }
-function startClock(){setInterval(()=>document.getElementById('clk').textContent=new Date().toTimeString().slice(0,8),1000);}
+function fmtClock(d){
+  const days=['일','월','화','수','목','금','토'];
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}(${days[d.getDay()]}) ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function startClock(){setInterval(()=>document.getElementById('clk').textContent=fmtClock(new Date()),1000);}
 
 async function loadAll(){ await Promise.all([loadDash(),loadFires(),loadReports(),loadMap(),loadBoard(),pollAlerts()]); FIRST_POLL_DONE=true; }
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
@@ -709,75 +731,174 @@ function clearRoute(){
   const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span>';
 }
 
-// ---- team expand panel (roster) ----
-let TEAM_EXPANDED={}, EDITING_MEMBER_D=null;
+// ---- team detail drawer (roster + drone management, big right-side panel) ----
 const ROLES_D=['공격','로봇','정찰','지원','통신','사이버'];
-function toggleTeamExpand(id){
-  TEAM_EXPANDED[id]=!TEAM_EXPANDED[id];
-  const row=document.getElementById('exprow_'+id);
-  if(row) row.style.display=TEAM_EXPANDED[id]?'table-row':'none';
-  const btn=document.querySelector(`[onclick="event.stopPropagation();toggleTeamExpand(${id})"]`);
-  if(btn) btn.textContent=TEAM_EXPANDED[id]?'▼':'▶';
-  if(TEAM_EXPANDED[id]) loadTeamDetail(id);
+const STATLBL_D={available:'가용',maintenance:'정비',destroyed:'파괴'};
+const CATLBL_D={attack:'공격',recon:'정찰'};
+let TD_TEAM_ID=null, EDITING_MEMBER_D=null, DRONE_MODELS_D=[], LAST_TEAMS=[];
+function openTeamDrawer(id){
+  TD_TEAM_ID=id;
+  document.getElementById('teamDrawer').style.display='flex';
+  loadTeamDrawer(id);
 }
-async function loadTeamDetail(id){
-  const el=document.getElementById('teamdetail_'+id);
-  if(!el) return;
-  el.innerHTML='<span class="muted" style="font-size:11px">불러오는 중…</span>';
+function closeTeamDrawer(){
+  document.getElementById('teamDrawer').style.display='none';
+  TD_TEAM_ID=null; EDITING_MEMBER_D=null;
+}
+function modelOptionsD(selId){
+  const groups={attack:[],recon:[]};
+  DRONE_MODELS_D.forEach(function(m){ (groups[m.category]||groups.attack).push(m); });
+  let html='';
+  ['attack','recon'].forEach(function(cat){
+    if(!groups[cat].length) return;
+    html += `<optgroup label="${CATLBL_D[cat]}">` + groups[cat].map(function(m){
+      return `<option value="${m.id}" ${(''+selId)===(''+m.id)?'selected':''}>${esc(m.name)}</option>`;
+    }).join('') + `</optgroup>`;
+  });
+  return html;
+}
+async function loadTeamDrawer(id){
+  const body=document.getElementById('td_body');
+  body.innerHTML='<div class="muted" style="font-size:12px">불러오는 중…</div>';
   try{
-    const d=await api('/team-members?team_id='+id);
-    const members=d.members||[];
-    el.innerHTML = `
-      <div class="lbl" style="margin-bottom:6px">팀원 현황</div>
-      <div style="display:flex;flex-direction:column;gap:5px;margin-bottom:8px">
-        ${members.length?members.map(function(m){
-          if(EDITING_MEMBER_D===m.id){
-            return `<div style="display:flex;gap:5px;align-items:center">
-              <input id="dedit_name_${m.id}" value="${esc(m.name)}" style="flex:1;font-size:12px;padding:5px 8px">
-              <select id="dedit_role_${m.id}" style="flex:1;font-size:12px;padding:5px 8px">${ROLES_D.map(function(r){return `<option value="${r}" ${r===m.role?'selected':''}>${r}</option>`;}).join('')}</select>
-              <button class="btn btn-ghost" style="padding:4px 8px;font-size:10.5px" onclick="cancelEditMemberD(${id})">취소</button>
-              <button class="btn btn-amber" style="padding:4px 8px;font-size:10.5px" onclick="saveEditMemberD(${m.id},${id})">저장</button>
-            </div>`;
-          }
-          return `<div class="between" style="font-size:12px">
-            <span>${esc(m.name)} <span class="chip" style="background:var(--surface);color:var(--text);margin-left:4px">${esc(m.role)}</span></span>
-            <span style="display:flex;gap:5px">
-              <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="startEditMemberD(${m.id},${id})">수정</button>
-              <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="deleteMemberD(${m.id},${id})">삭제</button>
-            </span></div>`;
-        }).join('') : '<span class="muted" style="font-size:11.5px">등록된 팀원이 없습니다.</span>'}
+    const [dm, mm, dd] = await Promise.all([
+      DRONE_MODELS_D.length?Promise.resolve({models:DRONE_MODELS_D}):api('/drone-models'),
+      api('/team-members?team_id='+id),
+      api('/drones?team_id='+id),
+    ]);
+    DRONE_MODELS_D = dm.models||DRONE_MODELS_D;
+    const members=mm.members||[];
+    const drones=dd.drones||[];
+    const team=LAST_TEAMS.find(function(t){return t.id===id;})||{};
+    const s=STATUS[team.status]||[team.status,'var(--muted)'];
+    document.getElementById('td_title').innerHTML = `<span style="color:${teamColorForNo(team.team_no)}">${esc(team.team_no)}팀</span> 상세관리`;
+    body.innerHTML = `
+      <div class="between" style="margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:10px">
+        <span style="font-size:12.5px"><span class="dot" style="background:${s[1]}"></span>${s[0]}</span>
+        <span class="mono muted" style="font-size:11px">${esc(coordText(team.lat,team.lng,team.coord))}</span>
       </div>
-      <div style="display:flex;gap:5px">
-        <input id="dnm_name_${id}" placeholder="이름" style="flex:1;font-size:12px;padding:6px 8px">
-        <select id="dnm_role_${id}" style="flex:1;font-size:12px;padding:6px 8px">${ROLES_D.map(function(r){return `<option value="${r}">${r}</option>`;}).join('')}</select>
-        <button class="btn btn-amber" style="padding:6px 10px;font-size:11px" onclick="addMemberD(${id})">+ 추가</button>
+      <div class="lbl" style="margin-bottom:6px">팀원 현황 (${members.length}명)</div>
+      <div id="td_members" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"></div>
+      <div class="card" style="margin-bottom:18px">
+        <div class="lbl">팀원 추가</div>
+        <input id="td_nm_name" placeholder="이름" style="margin-bottom:8px">
+        <select id="td_nm_role" style="margin-bottom:8px">${ROLES_D.map(function(r){return `<option value="${r}">${r}</option>`;}).join('')}</select>
+        <button class="btn btn-ghost" style="padding:9px;width:100%" onclick="addMemberD(${id})">+ 팀원 추가</button>
+      </div>
+      <div class="lbl" style="margin-bottom:6px">기체 현황 (${drones.length}대)</div>
+      <div id="td_drones" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px"></div>
+      <div class="card">
+        <div class="lbl">신규 기체 등록</div>
+        <input id="td_nd_code" placeholder="기체 코드 (예: 1호기)" style="margin-bottom:8px">
+        <select id="td_nd_model" style="margin-bottom:8px">${modelOptionsD()}</select>
+        <button class="btn btn-ghost" style="padding:10px;width:100%" onclick="createDroneD(${id})">+ 기체 추가</button>
       </div>`;
-  }catch(e){ el.innerHTML='<span class="muted" style="font-size:11px">불러오기 실패</span>'; }
+    renderMemberListD(members, id);
+    document.getElementById('td_drones').innerHTML = drones.length ? drones.map(function(dr){ return droneCardD(dr); }).join('') : '<div class="muted" style="font-size:12px">등록된 기체가 없습니다.</div>';
+  }catch(e){ body.innerHTML='<div class="muted" style="font-size:12px">불러오기 실패</div>'; }
 }
-function startEditMemberD(mid,tid){ EDITING_MEMBER_D=mid; loadTeamDetail(tid); }
-function cancelEditMemberD(tid){ EDITING_MEMBER_D=null; loadTeamDetail(tid); }
+function renderMemberListD(members, tid){
+  const el=document.getElementById('td_members'); if(!el) return;
+  el.innerHTML = members.length ? members.map(function(m){
+    if(EDITING_MEMBER_D===m.id){
+      return `<div class="card" style="padding:9px 10px">
+        <input id="dedit_name_${m.id}" value="${esc(m.name)}" style="margin-bottom:6px">
+        <select id="dedit_role_${m.id}" style="margin-bottom:6px">${ROLES_D.map(function(r){return `<option value="${r}" ${r===m.role?'selected':''}>${r}</option>`;}).join('')}</select>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost" style="flex:1;padding:6px;font-size:11px" onclick="cancelEditMemberD(${tid})">취소</button>
+          <button class="btn btn-amber" style="flex:1;padding:6px;font-size:11px" onclick="saveEditMemberD(${m.id},${tid})">저장</button>
+        </div></div>`;
+    }
+    return `<div class="card between" style="padding:8px 10px">
+      <span style="font-size:12.5px">${esc(m.name)} <span class="chip" style="background:var(--surface);color:var(--text);margin-left:4px">${esc(m.role)}</span></span>
+      <span style="display:flex;gap:5px">
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10.5px" onclick="startEditMemberD(${m.id},${tid})">수정</button>
+        <button class="btn btn-ghost" style="padding:3px 8px;font-size:10.5px" onclick="deleteMemberD(${m.id},${tid})">삭제</button>
+      </span></div>`;
+  }).join('') : '<div class="muted" style="font-size:11.5px">등록된 팀원이 없습니다.</div>';
+}
+function startEditMemberD(mid,tid){ EDITING_MEMBER_D=mid; loadTeamDrawer(tid); }
+function cancelEditMemberD(tid){ EDITING_MEMBER_D=null; loadTeamDrawer(tid); }
 async function saveEditMemberD(mid,tid){
   const name=document.getElementById('dedit_name_'+mid).value.trim();
   const role=document.getElementById('dedit_role_'+mid).value;
   if(!name){ toast('이름을 입력하세요'); return; }
-  try{ await api('/team-members/update','POST',{id:mid,name,role}); EDITING_MEMBER_D=null; loadTeamDetail(tid); }
+  try{ await api('/team-members/update','POST',{id:mid,name,role}); EDITING_MEMBER_D=null; loadTeamDrawer(tid); }
   catch(e){ toast('수정 실패'); }
 }
 async function deleteMemberD(mid,tid){
   if(!confirm('이 팀원을 삭제하시겠습니까?')) return;
-  try{ await api('/team-members/delete','POST',{id:mid}); loadTeamDetail(tid); }catch(e){ toast('삭제 실패'); }
+  try{ await api('/team-members/delete','POST',{id:mid}); loadTeamDrawer(tid); }catch(e){ toast('삭제 실패'); }
 }
 async function addMemberD(tid){
-  const name=document.getElementById('dnm_name_'+tid).value.trim();
-  const role=document.getElementById('dnm_role_'+tid).value;
+  const name=document.getElementById('td_nm_name').value.trim();
+  const role=document.getElementById('td_nm_role').value;
   if(!name){ toast('이름을 입력하세요'); return; }
-  try{ await api('/team-members/create','POST',{team_id:tid,name,role}); loadTeamDetail(tid); }
+  try{ await api('/team-members/create','POST',{team_id:tid,name,role}); loadTeamDrawer(tid); }
   catch(e){ toast('추가 실패'); }
+}
+function droneCardD(dr){
+  const bp=dr.battery_pct??0;
+  const catTxt = dr.model_category ? ' · '+CATLBL_D[dr.model_category] : '';
+  return `<div class="card" id="tdc_${dr.id}">
+    <div class="between" style="margin-bottom:9px"><span class="val" style="color:var(--ink);font-weight:700">✈️ ${esc(dr.code)}</span>
+      <span class="muted" style="font-size:11.5px">${esc(dr.model_name||'')}${catTxt}</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
+      <div>
+        <div class="lbl">모델</div>
+        <select id="tdr_model_${dr.id}">${modelOptionsD(dr.model_id)}</select>
+      </div>
+      <div>
+        <div class="lbl">배터리 (%)</div>
+        <input type="number" min="0" max="100" id="tdr_bp_${dr.id}" value="${bp}">
+      </div>
+      <div>
+        <div class="lbl">통신 상태</div>
+        <select id="tdr_comm_${dr.id}">
+          <option value="good" ${dr.comm_status==='good'?'selected':''}>양호</option>
+          <option value="weak" ${dr.comm_status==='weak'?'selected':''}>미약</option>
+          <option value="lost" ${dr.comm_status==='lost'?'selected':''}>두절</option>
+        </select>
+      </div>
+      <div>
+        <div class="lbl">GPS 상태</div>
+        <select id="tdr_gps_${dr.id}">
+          <option value="fixed" ${dr.gps_status==='fixed'?'selected':''}>고정</option>
+          <option value="searching" ${dr.gps_status==='searching'?'selected':''}>탐색중</option>
+          <option value="none" ${dr.gps_status==='none'?'selected':''}>없음</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <div class="lbl">운용 상태</div>
+        <select id="tdr_stat_${dr.id}">
+          <option value="available" ${dr.status==='available'?'selected':''}>가용</option>
+          <option value="maintenance" ${dr.status==='maintenance'?'selected':''}>정비</option>
+          <option value="destroyed" ${dr.status==='destroyed'?'selected':''}>파괴</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-amber" style="padding:9px;width:100%" onclick="saveDroneD(${dr.id})">저장</button>
+  </div>`;
+}
+async function saveDroneD(id){
+  const g=k=>document.getElementById(k+'_'+id).value;
+  try{
+    await api('/drones/update','POST',{id,model_id:+g('tdr_model')||null,battery_pct:+g('tdr_bp'),comm_status:g('tdr_comm'),gps_status:g('tdr_gps'),status:g('tdr_stat')});
+    toast('기체 정보 저장됨'); loadDash();
+  }catch(e){ toast('저장 실패'); }
+}
+async function createDroneD(tid){
+  const code=document.getElementById('td_nd_code').value.trim();
+  const modelId=+document.getElementById('td_nd_model').value||null;
+  if(!code){ toast('기체 코드를 입력하세요'); return; }
+  try{ await api('/drones/create','POST',{team_id:tid,code,model_id:modelId}); toast('기체 추가됨'); loadTeamDrawer(tid); loadDash(); }
+  catch(e){ toast('추가 실패 (중복 코드일 수 있음)'); }
 }
 
 async function loadDash(){
   try{
     const d=await api('/dashboard');
+    LAST_TEAMS=d.teams||[];
     (d.teams||[]).forEach(function(t){ TEAMNO[t.id]=t.team_no; TEAMCOLORS[t.id]=teamColorForNo(t.team_no); if(t.lat!=null&&t.lng!=null) TEAMLATLNG[t.id]=[+t.lat,+t.lng]; });
     document.getElementById('counts').innerHTML=`
       <div class="ministat"><span class="n">${d.counts.missions_pending}</span><span class="l">대기 임무</span></div>
@@ -786,32 +907,32 @@ async function loadDash(){
     document.getElementById('teams').innerHTML=(d.teams||[]).map(t=>{
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
       const coordTip=esc(coordText(t.lat,t.lng,t.coord));
-      const expanded=!!TEAM_EXPANDED[t.id];
       return `<tr onclick="flashTeam(${t.id})" title="좌표: ${coordTip}">
         <td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">
-          <button class="expand-arrow" onclick="event.stopPropagation();toggleTeamExpand(${t.id})">${expanded?'▼':'▶'}</button><button class="expand-arrow" onclick="event.stopPropagation();openMessageModal(${t.id},'${esc(t.team_no)}')" title="메시지 보내기">💬</button>${esc(t.team_no)}팀</td>
+          <button class="expand-arrow" onclick="event.stopPropagation();openTeamDrawer(${t.id})" title="팀 상세관리">▶</button><button class="expand-arrow" onclick="event.stopPropagation();openMessageModal(${t.id},'${esc(t.team_no)}')" title="메시지 보내기">💬</button>${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
-        <td data-label="기체">${t.drone_count}</td></tr>
-        <tr id="exprow_${t.id}" style="display:${expanded?'table-row':'none'}"><td colspan="3" style="padding:0">
-          <div id="teamdetail_${t.id}" style="padding:9px 6px;background:var(--surface2);border-radius:0 0 8px 8px"></div>
-        </td></tr>`;}).join('');
-    Object.keys(TEAM_EXPANDED).forEach(function(id){ if(TEAM_EXPANDED[id]) loadTeamDetail(+id); });
+        <td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
+    if(TD_TEAM_ID!=null) loadTeamDrawer(TD_TEAM_ID);
     const sel=document.getElementById('m_team');
     if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; redrawRoute(); }
   }catch(e){ if(e.error==='unauthorized') logout(); }
 }
+let OPEN_DECIDE={}, OPEN_DECIDE_TEXT={};
 function fireCardHtml(f, suffix){
   const canAct=(ROLE==='admin'||ROLE==='fire_coord');
   const decidedInfo = f.status==='decided' ? ` · ${f.fire_time?('예정 '+esc(f.fire_time)):'미정'}` : '';
   const createdTime = esc(String(f.created_at||'')).slice(5,16);
+  const key=f.id+suffix;
+  const isOpen=!!OPEN_DECIDE[key];
+  const savedText=esc(OPEN_DECIDE_TEXT[key]||'');
   const actions = canAct ? `
-    <div id="fbtns_${f.id}${suffix}" style="margin-top:6px;display:flex;gap:6px">
+    <div id="fbtns_${f.id}${suffix}" style="margin-top:6px;display:${isOpen?'none':'flex'};gap:6px">
       <button class="btn btn-ghost" onclick="fstat(${f.id},'received')">접수완료</button>
       <button class="btn btn-ghost" onclick="fstat(${f.id},'held')">보류</button>
       <button class="btn btn-amber" onclick="showDecideForm(${f.id},'${suffix}')">결정</button>
     </div>
-    <div id="fdecide_${f.id}${suffix}" style="display:none;margin-top:6px">
-      <input id="ftime_${f.id}${suffix}" placeholder="사격 예정시간 (예: 14:30, 비우면 미정)" style="margin-bottom:6px">
+    <div id="fdecide_${f.id}${suffix}" style="display:${isOpen?'block':'none'};margin-top:6px">
+      <input id="ftime_${f.id}${suffix}" value="${savedText}" placeholder="사격 예정시간 (예: 14:30, 비우면 미정)" style="margin-bottom:6px">
       <div style="display:flex;gap:6px">
         <button class="btn btn-ghost" style="flex:1" onclick="cancelDecideForm(${f.id},'${suffix}')">취소</button>
         <button class="btn btn-amber" style="flex:1" onclick="submitDecide(${f.id},'${suffix}')">결정 저장</button>
@@ -827,6 +948,11 @@ function fireCardHtml(f, suffix){
 }
 async function loadFires(){
   try{ const d=await api('/fire-requests'); const arr=(d.fire_requests||[]);
+    // capture whatever the admin is currently typing in any open decide-forms before we rebuild the DOM
+    Object.keys(OPEN_DECIDE).forEach(function(key){
+      const el=document.getElementById('ftime_'+key);
+      if(el) OPEN_DECIDE_TEXT[key]=el.value;
+    });
     if(arr.length){
       const maxId=Math.max.apply(null, arr.map(function(f){return f.id;}));
       if(FIRST_POLL_DONE && maxId>SEEN_MAX_FIRE){
@@ -843,11 +969,13 @@ async function loadFires(){
 }
 function showDecideForm(id,suffix){
   suffix=suffix||'';
+  OPEN_DECIDE[id+suffix]=true;
   const b=document.getElementById('fbtns_'+id+suffix); if(b) b.style.display='none';
   const f=document.getElementById('fdecide_'+id+suffix); if(f) f.style.display='block';
 }
 function cancelDecideForm(id,suffix){
   suffix=suffix||'';
+  delete OPEN_DECIDE[id+suffix]; delete OPEN_DECIDE_TEXT[id+suffix];
   const b=document.getElementById('fbtns_'+id+suffix); if(b) b.style.display='flex';
   const f=document.getElementById('fdecide_'+id+suffix); if(f) f.style.display='none';
 }
@@ -855,7 +983,11 @@ async function submitDecide(id,suffix){
   suffix=suffix||'';
   const e=document.getElementById('ftime_'+id+suffix);
   const v=e?e.value.trim():'';
-  try{ await api('/fire-requests/status','POST',{id,status:'decided',fire_time:v||null}); loadFires(); }catch(err){ alert('실패'); }
+  try{
+    await api('/fire-requests/status','POST',{id,status:'decided',fire_time:v||null});
+    delete OPEN_DECIDE[id+suffix]; delete OPEN_DECIDE_TEXT[id+suffix];
+    loadFires();
+  }catch(err){ alert('실패'); }
 }
 async function fstat(id,status){ try{ await api('/fire-requests/status','POST',{id,status,fire_time:null}); loadFires(); }catch(e){alert('권한이 없거나 실패했습니다.');} }
 
@@ -1009,7 +1141,7 @@ async function pollAlerts(){
 }
 function closeModalEl(id){ const el=document.getElementById(id); if(el) el.style.display='none'; }
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){ ['modal_board','modal_reports','modal_fires'].forEach(closeModalEl); }
+  if(e.key==='Escape'){ ['modal_board','modal_reports','modal_fires','modal_message'].forEach(closeModalEl); closeTeamDrawer(); }
 });
 function prefillAttackTarget(lat, lng, coord, targetInfo){
   const typeSel=document.getElementById('m_type');

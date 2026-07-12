@@ -12,10 +12,11 @@
   body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
     max-width:460px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
   .mono{font-family:"SF Mono",ui-monospace,Consolas,monospace}
-  .ribbon{padding:11px 15px;background:linear-gradient(180deg,#15243a,#111e31);border-bottom:1px solid var(--line);
-    display:flex;align-items:center;gap:9px;position:sticky;top:0;z-index:10}
+  .ribbon{padding:9px 15px 8px;background:linear-gradient(180deg,#15243a,#111e31);border-bottom:1px solid var(--line);
+    display:flex;flex-direction:column;gap:4px;position:sticky;top:0;z-index:10}
+  .ribbon-top{display:flex;align-items:center;gap:9px}
   .ribbon .team{font-weight:800;color:var(--ink);font-size:16px}
-  .ribbon .clk{margin-left:auto;font-size:12.5px;color:#AFC3DA}
+  .ribbon-clk{font-size:11px;color:#AFC3DA;text-align:right;letter-spacing:.02em}
   .modeb{font-size:11px;font-weight:800;letter-spacing:.05em;padding:3px 9px;border-radius:6px}
   .mode-real{background:rgba(226,74,59,.16);color:#FF8579;border:1px solid rgba(226,74,59,.5)}
   .mode-sim{background:rgba(232,163,61,.16);color:#F3C070;border:1px solid rgba(232,163,61,.5)}
@@ -116,12 +117,14 @@
 <!-- ===== APP ===== -->
 <div id="app" style="display:none;flex-direction:column;flex:1">
   <div class="ribbon">
-    <span class="team" id="rb_team">3팀</span>
-    <span class="modeb" id="rb_mode">실제</span>
-    <span class="chip" id="rb_role" style="background:rgba(59,130,214,.18);color:#8fc0ff">운용자</span>
-    <span class="clk mono" id="rb_clk">--:--:--</span>
-    <button id="logoutbtn" onclick="doLogout()" title="로그아웃"
-      style="background:none;border:none;color:var(--muted);font-size:17px;padding:2px 0 2px 4px;cursor:pointer;line-height:1">⏻</button>
+    <div class="ribbon-top">
+      <span class="team" id="rb_team">3팀</span>
+      <span class="modeb" id="rb_mode">실제</span>
+      <span class="chip" id="rb_role" style="background:rgba(59,130,214,.18);color:#8fc0ff">운용자</span>
+      <button id="logoutbtn" onclick="doLogout()" title="로그아웃"
+        style="background:none;border:none;color:var(--muted);font-size:17px;padding:2px 0 2px 4px;cursor:pointer;line-height:1;margin-left:auto">⏻</button>
+    </div>
+    <div class="ribbon-clk mono" id="rb_clk">----.--.--(-) --:--:--</div>
   </div>
   <main id="view"></main>
   <nav class="tabs" id="tabs">
@@ -368,8 +371,13 @@ function enterApp(){
   startAutoReport();
   startNotifyPoll();
 }
-function startClock(){setInterval(()=>{const n=new Date();
-  document.getElementById('rb_clk').textContent=n.toTimeString().slice(0,8);},1000);}
+function fmtClock(d){
+  const days=['일','월','화','수','목','금','토'];
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())}(${days[d.getDay()]}) ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function startClock(){setInterval(()=>{
+  document.getElementById('rb_clk').textContent=fmtClock(new Date());},1000);}
 
 // ---- nav ----
 document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>{
