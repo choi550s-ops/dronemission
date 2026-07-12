@@ -88,12 +88,11 @@
   .roe-inline{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
   .roe-inline label{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text);cursor:pointer}
   .roe-inline input{width:14px;height:14px;flex:none;padding:0}
-  .team-drawer{position:fixed;top:0;right:0;bottom:0;width:min(600px,94vw);background:var(--surface);
-    border-left:1px solid var(--line);z-index:75;display:flex;flex-direction:column;
-    box-shadow:-24px 0 60px -20px rgba(0,0,0,.65);animation:drawerIn .22s ease-out}
-  @keyframes drawerIn{0%{transform:translateX(100%)}100%{transform:translateX(0)}}
-  .team-drawer-head{padding:15px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex:none}
-  .team-drawer-body{padding:16px 20px;overflow-y:auto;flex:1;min-height:0}
+  .team-inmap-panel{position:absolute;inset:0;background:var(--surface);z-index:15;display:flex;flex-direction:column;
+    border-radius:10px;overflow:hidden;animation:panelIn .18s ease-out}
+  @keyframes panelIn{0%{opacity:0}100%{opacity:1}}
+  .team-inmap-head{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex:none}
+  .team-inmap-body{padding:15px 18px;overflow-y:auto;flex:1;min-height:0}
   .modal-overlay{position:fixed;inset:0;background:rgba(4,9,17,.72);z-index:70;display:flex;align-items:center;justify-content:center;padding:24px}
   .modal-box{background:var(--surface);border:1px solid var(--line);border-radius:14px;width:min(1200px,95vw);max-height:88vh;
     display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 60px -20px rgba(0,0,0,.6)}
@@ -173,9 +172,9 @@
     .modal-overlay{padding:8px}
     .modal-head{padding:10px 12px}
     .modal-body{padding:10px 12px}
-    .team-drawer{width:100vw}
-    .team-drawer-head{padding:12px 14px}
-    .team-drawer-body{padding:12px 14px}
+    .team-inmap-panel{position:relative;inset:auto;min-height:70vh;border-radius:0}
+    .team-inmap-head{padding:12px 14px}
+    .team-inmap-body{padding:12px 14px}
   }
 </style>
 <link rel="stylesheet" href="../vendor/leaflet/leaflet.css">
@@ -211,7 +210,7 @@
         <tbody id="teams"></tbody></table>
     </div>
 
-    <div class="col colCenter mapcard">
+    <div class="col colCenter mapcard" style="position:relative">
       <div class="maphd">
         <h2 style="margin:0">공통작전상황도 (COP)</h2>
         <span id="drawhint" style="display:none;margin-left:10px;font-size:11.5px;font-weight:700;color:#F3C070">● 경로 그리기 중 — 지도를 클릭</span>
@@ -224,6 +223,13 @@
         </div>
       </div>
       <div id="map"></div>
+      <div id="teamPanel" class="team-inmap-panel" style="display:none">
+        <div class="team-inmap-head">
+          <h2 id="td_title" style="margin:0">팀 상세</h2>
+          <button class="btn btn-ghost" onclick="closeTeamDrawer()">← 지도로 돌아가기</button>
+        </div>
+        <div class="team-inmap-body" id="td_body"></div>
+      </div>
       <div class="leg">
         <span class="leg-group">
           <b class="leg-label">상태(테두리)</b>
@@ -333,14 +339,6 @@
     <div class="modal-head"><h2 style="margin:0">화력협조 요청 — 전체보기</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_fires')">✕ 닫기</button></div>
     <div class="modal-body" id="fires_modal" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
-</div>
-
-<div id="teamDrawer" class="team-drawer" style="display:none">
-  <div class="team-drawer-head">
-    <h2 id="td_title" style="margin:0">팀 상세</h2>
-    <button class="btn btn-ghost" onclick="closeTeamDrawer()">✕ 닫기</button>
-  </div>
-  <div class="team-drawer-body" id="td_body"></div>
 </div>
 
 <div id="modal_message" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_message')">
@@ -738,11 +736,11 @@ const CATLBL_D={attack:'공격',recon:'정찰'};
 let TD_TEAM_ID=null, EDITING_MEMBER_D=null, DRONE_MODELS_D=[], LAST_TEAMS=[];
 function openTeamDrawer(id){
   TD_TEAM_ID=id;
-  document.getElementById('teamDrawer').style.display='flex';
+  document.getElementById('teamPanel').style.display='flex';
   loadTeamDrawer(id);
 }
 function closeTeamDrawer(){
-  document.getElementById('teamDrawer').style.display='none';
+  document.getElementById('teamPanel').style.display='none';
   TD_TEAM_ID=null; EDITING_MEMBER_D=null;
 }
 function modelOptionsD(selId){
@@ -774,7 +772,7 @@ async function loadTeamDrawer(id){
     document.getElementById('td_title').innerHTML = `<span style="color:${teamColorForNo(team.team_no)}">${esc(team.team_no)}팀</span> 상세관리`;
     body.innerHTML = `
       <div class="between" style="margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:10px">
-        <span style="font-size:12.5px"><span class="dot" style="background:${s[1]}"></span>${s[0]}</span>
+        <span style="font-size:12.5px"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</span>
         <span class="mono muted" style="font-size:11px">${esc(coordText(team.lat,team.lng,team.coord))}</span>
       </div>
       <div class="lbl" style="margin-bottom:6px">팀원 현황 (${members.length}명)</div>
@@ -838,52 +836,27 @@ async function addMemberD(tid){
   catch(e){ toast('추가 실패'); }
 }
 function droneCardD(dr){
-  const bp=dr.battery_pct??0;
   const catTxt = dr.model_category ? ' · '+CATLBL_D[dr.model_category] : '';
   return `<div class="card" id="tdc_${dr.id}">
     <div class="between" style="margin-bottom:9px"><span class="val" style="color:var(--ink);font-weight:700">✈️ ${esc(dr.code)}</span>
       <span class="muted" style="font-size:11.5px">${esc(dr.model_name||'')}${catTxt}</span></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px">
-      <div>
-        <div class="lbl">모델</div>
-        <select id="tdr_model_${dr.id}">${modelOptionsD(dr.model_id)}</select>
-      </div>
-      <div>
-        <div class="lbl">배터리 (%)</div>
-        <input type="number" min="0" max="100" id="tdr_bp_${dr.id}" value="${bp}">
-      </div>
-      <div>
-        <div class="lbl">통신 상태</div>
-        <select id="tdr_comm_${dr.id}">
-          <option value="good" ${dr.comm_status==='good'?'selected':''}>양호</option>
-          <option value="weak" ${dr.comm_status==='weak'?'selected':''}>미약</option>
-          <option value="lost" ${dr.comm_status==='lost'?'selected':''}>두절</option>
-        </select>
-      </div>
-      <div>
-        <div class="lbl">GPS 상태</div>
-        <select id="tdr_gps_${dr.id}">
-          <option value="fixed" ${dr.gps_status==='fixed'?'selected':''}>고정</option>
-          <option value="searching" ${dr.gps_status==='searching'?'selected':''}>탐색중</option>
-          <option value="none" ${dr.gps_status==='none'?'selected':''}>없음</option>
-        </select>
-      </div>
-      <div style="grid-column:1/-1">
-        <div class="lbl">운용 상태</div>
-        <select id="tdr_stat_${dr.id}">
-          <option value="available" ${dr.status==='available'?'selected':''}>가용</option>
-          <option value="maintenance" ${dr.status==='maintenance'?'selected':''}>정비</option>
-          <option value="destroyed" ${dr.status==='destroyed'?'selected':''}>파괴</option>
-        </select>
-      </div>
-    </div>
+    <div class="lbl">모델</div>
+    <select id="tdr_model_${dr.id}" style="margin-bottom:9px">${modelOptionsD(dr.model_id)}</select>
+    <div class="lbl">운용 가능상태</div>
+    <select id="tdr_stat_${dr.id}" style="margin-bottom:9px">
+      <option value="available" ${dr.status==='available'?'selected':''}>가용</option>
+      <option value="maintenance" ${dr.status==='maintenance'?'selected':''}>정비</option>
+      <option value="destroyed" ${dr.status==='destroyed'?'selected':''}>파괴</option>
+    </select>
+    <div class="lbl">비고 (특이사항)</div>
+    <input id="tdr_note_${dr.id}" value="${esc(dr.note||'')}" placeholder="예: 프로펠러 교체 필요" style="margin-bottom:10px">
     <button class="btn btn-amber" style="padding:9px;width:100%" onclick="saveDroneD(${dr.id})">저장</button>
   </div>`;
 }
 async function saveDroneD(id){
   const g=k=>document.getElementById(k+'_'+id).value;
   try{
-    await api('/drones/update','POST',{id,model_id:+g('tdr_model')||null,battery_pct:+g('tdr_bp'),comm_status:g('tdr_comm'),gps_status:g('tdr_gps'),status:g('tdr_stat')});
+    await api('/drones/update','POST',{id,model_id:+g('tdr_model')||null,status:g('tdr_stat'),note:g('tdr_note')});
     toast('기체 정보 저장됨'); loadDash();
   }catch(e){ toast('저장 실패'); }
 }

@@ -468,17 +468,12 @@ async function renderHome(){
     const d=await api('/drones?team_id='+(SESS.team_id||''));
     const drones=d.drones||[];
     let cards=drones.map(dr=>{
-      const bp=dr.battery_pct??'-';
-      const bc=bp>=50?'var(--green)':(bp>=20?'var(--yellow)':'var(--red)');
-      const cc=dr.comm_status==='good'?'var(--green)':(dr.comm_status==='weak'?'var(--yellow)':'var(--red)');
-      const gc=dr.gps_status==='fixed'?'var(--green)':(dr.gps_status==='searching'?'var(--yellow)':'var(--red)');
+      const catTxt = dr.model_category ? ' · '+CATLBL[dr.model_category] : '';
       return `<div class="card">
         <div class="between" style="margin-bottom:9px"><div class="row">✈️ <span class="val">기체 ${esc(dr.code)}</span></div>
           <span class="chip" style="background:rgba(47,163,90,.16);color:#6fe0a0">${STATLBL[dr.status]||esc(dr.status)}</span></div>
-        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot(bc)}배터리</span><span class="val mono">${bp}%</span></div>
-        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot(cc)}통신</span><span class="val">${COMM[dr.comm_status]||dr.comm_status}</span></div>
-        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot(gc)}GPS</span><span class="val">${GPS[dr.gps_status]||dr.gps_status}</span></div>
-        <div class="between" style="font-size:13px;padding:4px 0"><span class="row">${sdot('var(--yellow)')}최대 비행</span><span class="val mono">${dr.max_flight_min??'-'}분</span></div>
+        <div class="between" style="font-size:13px;padding:4px 0"><span class="muted">모델</span><span class="val">${esc(dr.model_name||'-')}${catTxt}</span></div>
+        ${dr.note?`<div style="font-size:12.5px;padding:4px 0;color:var(--amber)">📝 ${esc(dr.note)}</div>`:''}
       </div>`;}).join('');
     if(!drones.length) cards='<div class="card muted">배정된 기체가 없습니다.</div>';
     v.innerHTML=`<div class="between"><div class="lbl" style="margin:0">내 역할</div>
@@ -613,40 +608,27 @@ async function addMember(){
   catch(e){ toast('추가 실패'); }
 }
 function droneCard(dr){
-  const bp=dr.battery_pct??0;
   const catTxt = dr.model_category ? ' · '+CATLBL[dr.model_category] : '';
   return `<div class="card" id="dc_${dr.id}">
     <div class="between" style="margin-bottom:9px"><span class="val">✈️ ${esc(dr.code)}</span>
       <span class="muted" style="font-size:11.5px">${esc(dr.model_name||'')}${catTxt}</span></div>
     <div class="lbl">모델</div>
     <select id="dr_model_${dr.id}" style="margin-bottom:9px">${modelOptions(dr.model_id)}</select>
-    <div class="lbl">배터리 (%)</div>
-    <input type="number" min="0" max="100" id="dr_bp_${dr.id}" value="${bp}" style="margin-bottom:9px">
-    <div class="lbl">통신 상태</div>
-    <select id="dr_comm_${dr.id}" style="margin-bottom:9px">
-      <option value="good" ${dr.comm_status==='good'?'selected':''}>양호</option>
-      <option value="weak" ${dr.comm_status==='weak'?'selected':''}>미약</option>
-      <option value="lost" ${dr.comm_status==='lost'?'selected':''}>두절</option>
-    </select>
-    <div class="lbl">GPS 상태</div>
-    <select id="dr_gps_${dr.id}" style="margin-bottom:9px">
-      <option value="fixed" ${dr.gps_status==='fixed'?'selected':''}>고정</option>
-      <option value="searching" ${dr.gps_status==='searching'?'selected':''}>탐색중</option>
-      <option value="none" ${dr.gps_status==='none'?'selected':''}>없음</option>
-    </select>
-    <div class="lbl">운용 상태</div>
-    <select id="dr_stat_${dr.id}" style="margin-bottom:10px">
+    <div class="lbl">운용 가능상태</div>
+    <select id="dr_stat_${dr.id}" style="margin-bottom:9px">
       <option value="available" ${dr.status==='available'?'selected':''}>가용</option>
       <option value="maintenance" ${dr.status==='maintenance'?'selected':''}>정비</option>
       <option value="destroyed" ${dr.status==='destroyed'?'selected':''}>파괴</option>
     </select>
+    <div class="lbl">비고 (특이사항)</div>
+    <input id="dr_note_${dr.id}" value="${esc(dr.note||'')}" placeholder="예: 프로펠러 교체 필요" style="margin-bottom:10px">
     <button class="btn btn-amber" style="padding:10px" onclick="saveDrone(${dr.id})">저장</button>
   </div>`;
 }
 async function saveDrone(id){
   const g=k=>document.getElementById(k+'_'+id).value;
   try{
-    await api('/drones/update','POST',{id,model_id:+g('dr_model')||null,battery_pct:+g('dr_bp'),comm_status:g('dr_comm'),gps_status:g('dr_gps'),status:g('dr_stat')});
+    await api('/drones/update','POST',{id,model_id:+g('dr_model')||null,status:g('dr_stat'),note:g('dr_note')});
     toast('기체 정보 저장됨');
   }catch(e){ toast('저장 실패'); }
 }

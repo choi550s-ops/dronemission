@@ -213,7 +213,7 @@ function route($path, $method)
             'status'      => array('available','maintenance','destroyed'),
         );
         $sets = array(); $vals = array();
-        foreach (array('model_id','max_flight_min','battery_count','range_km','battery_pct','comm_status','gps_status','status') as $f) {
+        foreach (array('model_id','max_flight_min','battery_count','range_km','battery_pct','comm_status','gps_status','status','note') as $f) {
             if (!array_key_exists($f, $b)) { continue; }
             if (isset($enum[$f]) && !in_array($b[$f], $enum[$f], true)) { continue; }
             $sets[] = "$f = ?"; $vals[] = $b[$f];
