@@ -260,13 +260,15 @@ function route($path, $method)
         $mode   = (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real';
         $rp = pval($b, 'route_points');
         if (is_array($rp)) { $rp = json_encode($rp); } elseif (!is_string($rp)) { $rp = null; }
+        $route = trim((string) pval($b, 'route', ''));
+        if ($route === '') { $route = '자율'; }
         $st = $pdo->prepare(
-            "INSERT INTO iuccs_missions(team_id, type, coord, lat, lng, route, method, mode, status, issued_by, route_points)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+            "INSERT INTO iuccs_missions(team_id, type, coord, lat, lng, route, method, mode, status, issued_by, route_points, target)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'team_id', $s['team_id']), $type, pval($b, 'coord'), pval($b, 'lat'), pval($b, 'lng'),
-            pval($b, 'route'), pval($b, 'method'), $mode, $status, $s['user_id'], $rp,
+            $route, pval($b, 'method'), $mode, $status, $s['user_id'], $rp, pval($b, 'target'),
         ));
         $id = $pdo->lastInsertId();
         log_activity('user#' . $s['user_id'], 'mission_issue', 'mission', $id, $type);
@@ -403,14 +405,15 @@ function route($path, $method)
     if ($path === '/api/fire-requests' && $method === 'POST') {
         $s  = Auth::require_auth();
         $b  = body_json();
+        $sf = pval($b, 'support_from');
+        $sf = ($sf === 'adjacent') ? 'adjacent' : (($sf === 'higher') ? 'higher' : null);
         $st = $pdo->prepare(
             "INSERT INTO iuccs_fire_requests(team_id, coord, lat, lng, target, scale, support_from, mode)
              VALUES (?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'team_id', $s['team_id']), pval($b, 'coord'), pval($b, 'lat'), pval($b, 'lng'),
-            pval($b, 'target'), pval($b, 'scale'),
-            (pval($b, 'support_from', 'higher') === 'adjacent') ? 'adjacent' : 'higher',
+            pval($b, 'target'), pval($b, 'scale'), $sf,
             (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real',
         ));
         $id = $pdo->lastInsertId();
@@ -420,9 +423,11 @@ function route($path, $method)
     if ($path === '/api/fire-requests/status' && $method === 'POST') {
         $s       = Auth::require_auth(array('admin', 'fire_coord'));
         $b       = body_json();
-        $allowed = array('received', 'reviewing', 'approved', 'held', 'executed', 'rejected');
+        $allowed = array('received', 'held', 'decided');
         $stt     = in_array(pval($b, 'status', ''), $allowed, true) ? $b['status'] : 'received';
-        $pdo->prepare("UPDATE iuccs_fire_requests SET status = ? WHERE id = ?")->execute(array($stt, pval($b, 'id', 0)));
+        $ft = pval($b, 'fire_time');
+        $pdo->prepare("UPDATE iuccs_fire_requests SET status = ?, fire_time = ? WHERE id = ?")
+            ->execute(array($stt, $ft, pval($b, 'id', 0)));
         log_activity('user#' . $s['user_id'], 'fire_status', 'fire_request', pval($b, 'id', 0), $stt);
         json_out(array('ok' => true));
     }

@@ -64,9 +64,13 @@
   .mapcard{display:flex;flex-direction:column;flex:1;min-height:0}
   .maphd{flex:none;display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
   #map{flex:1;min-height:0;border-radius:10px;border:1px solid var(--line);background:#0b1626;z-index:1}
-  .leg{flex:none;display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px}
+  .leg{flex:none;display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:8px;align-items:center}
   .leg span{display:inline-flex;align-items:center;gap:5px}
   .leg i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .leg i.ring{background:transparent!important;border:2.5px solid;box-sizing:border-box}
+  .leg-group{display:inline-flex;align-items:center;gap:12px;padding:3px 12px;border-left:1px solid var(--line)}
+  .leg-group:first-child{border-left:none;padding-left:0}
+  .leg-label{color:var(--text);font-weight:700;font-size:10.5px;margin-right:2px}
   .leg i.diamond-leg{border-radius:0;transform:rotate(45deg);width:8px;height:8px}
   .leg i.line-leg{width:14px;height:2px;border-radius:0}
 
@@ -175,7 +179,7 @@
     <div class="col colLeft card">
       <div class="ministats" id="counts"></div>
       <h2>팀 · 자산 현황</h2>
-      <table><thead><tr><th>팀</th><th>상태</th><th>좌표</th><th>기체</th></tr></thead>
+      <table><thead><tr><th>팀</th><th>상태</th><th>기체</th></tr></thead>
         <tbody id="teams"></tbody></table>
     </div>
 
@@ -184,6 +188,7 @@
         <h2 style="margin:0">공통작전상황도 (COP)</h2>
         <span id="drawhint" style="display:none;margin-left:10px;font-size:11.5px;font-weight:700;color:#F3C070">● 경로 그리기 중 — 지도를 클릭</span>
         <div style="display:flex;gap:6px;margin-left:auto">
+          <span class="lyr" onclick="fitAllView()" style="background:var(--steel);color:#fff;border-color:var(--steel)">⤢ 전체보기</span>
           <span class="lyr on" data-layer="teams" onclick="toggleLayer(this)">팀</span>
           <span class="lyr on" data-layer="reports" onclick="toggleLayer(this)">정찰</span>
           <span class="lyr on" data-layer="fires" onclick="toggleLayer(this)">화력요청</span>
@@ -192,15 +197,21 @@
       </div>
       <div id="map"></div>
       <div class="leg">
-        <span><i style="background:#E24A3B"></i>테두리: 운용불가</span>
-        <span><i style="background:#E1A800"></i>준비중</span>
-        <span><i style="background:#2FA35A"></i>준비완료</span>
-        <span><i style="background:#3B82D6"></i>임무중</span>
-        <span><i class="diamond-leg" style="background:#E24A3B"></i>적 식별(점멸=미조치)</span>
-        <span><i style="background:#2FA35A;border-radius:2px"></i>아군 확인</span>
-        <span><i style="background:#E8A33D"></i>정찰 결과</span>
-        <span><i style="background:#ff5b5b"></i>화력요청</span>
-        <span><i class="line-leg" style="background:#E8A33D"></i>임무 경로</span>
+        <span class="leg-group">
+          <b class="leg-label">상태(테두리)</b>
+          <span><i class="ring" style="border-color:#E24A3B"></i>운용불가</span>
+          <span><i class="ring" style="border-color:#E1A800"></i>준비중</span>
+          <span><i class="ring" style="border-color:#2FA35A"></i>준비완료</span>
+          <span><i class="ring" style="border-color:#3B82D6"></i>임무중</span>
+        </span>
+        <span class="leg-group">
+          <b class="leg-label">지도 표식</b>
+          <span><i class="diamond-leg" style="background:#E24A3B"></i>적 식별(점멸=미조치)</span>
+          <span><i style="background:#2FA35A;border-radius:2px"></i>아군 확인</span>
+          <span><i style="background:#E8A33D"></i>정찰 결과</span>
+          <span><i style="background:#ff5b5b"></i>화력요청</span>
+          <span><i class="line-leg" style="background:#E8A33D"></i>임무 경로</span>
+        </span>
         <span class="muted">· 채움색 = 팀 고유색</span>
       </div>
     </div>
@@ -211,8 +222,18 @@
         <div style="display:flex;flex-direction:column;gap:9px">
           <select id="m_team" onchange="redrawRoute()"></select>
           <select id="m_type" onchange="onTypeChange()"><option value="recon">정찰</option><option value="attack">공격</option></select>
-          <input id="m_coord" class="mono" placeholder="군사좌표 자동 (지도 지정 시)">
-          <input id="m_route" placeholder="비고/방식 (예: 자율 / 표적지정)">
+          <div id="m_target_wrap" style="display:none">
+            <input id="m_target" placeholder="표적 (예: 병력·차량 등)">
+          </div>
+          <div class="lbl" style="margin:2px 0 0">군사좌표 수동 입력 (또는 지도 클릭)</div>
+          <div style="display:flex;gap:5px">
+            <input id="m_mgrs_zone" class="mono" placeholder="52S" style="width:22%;text-align:center">
+            <input id="m_mgrs_sq" class="mono" placeholder="CG" style="width:18%;text-align:center">
+            <input id="m_mgrs_e" class="mono" placeholder="12345" style="width:30%;text-align:center">
+            <input id="m_mgrs_n" class="mono" placeholder="67890" style="width:30%;text-align:center">
+          </div>
+          <button class="btn btn-ghost" style="padding:7px" onclick="applyManualMGRS()">↳ 좌표 적용</button>
+          <input id="m_route" placeholder="비고/방식 (비우면 &quot;자율&quot;로 하달)">
           <button class="btn btn-ghost" id="drawbtn" style="padding:9px" onclick="toggleDraw()">✎ 지도에서 경로 그리기</button>
           <div class="mcoords" id="m_coords"><span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span></div>
           <div style="display:flex;gap:6px">
@@ -259,7 +280,7 @@ const API=location.pathname.replace(/\/public\/.*$/,'')+'/api';
 let TOKEN=sessionStorage.getItem('iuccs_dash_token')||null, ROLE=sessionStorage.getItem('iuccs_dash_role')||null;
 const STATUS={unavailable:['적색·운용불가','var(--red)'],preparing:['황색·준비중','var(--yellow)'],
   ready:['녹색·준비완료','var(--green)'],on_mission:['청색·임무중','var(--blue)']};
-const FSTAT={received:'접수',reviewing:'검토',approved:'승인',held:'보류',executed:'시행',rejected:'반려'};
+const FSTAT={received:'접수완료',held:'보류',decided:'결정'};
 const esc=s=>String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 function toMGRS(lat,lng){
   if(lat==null||lng==null||lat===''||lng===''||isNaN(+lat)||isNaN(+lng)) return null;
@@ -358,12 +379,10 @@ async function loadBoard(){
       const reps=m.reports||[];
       let lastRepHtml='<span class="muted">보고 없음</span>';
       if(reps.length){
-        const r=reps[0];
-        const c = r.kind==='recon' ? `병력${r.troops??0}·트럭${r.trucks??0}·차량${r.vehicles??0}${r.hostile==1?' 🔺':''}`
-                : `무장${r.armed??0}·비무장${r.unarmed??0}·사망${r.kia??0}${r.failed==1?' 실패':''}`;
-        const more = reps.length>1?` <span class="muted">(+${reps.length-1}건)</span>`:'';
-        const ackBtn = r.acknowledged==1?'<span class="muted">(확인)</span>':`<button class="btn btn-ghost" style="padding:2px 8px;font-size:10.5px" onclick="ackReport(${r.id})">확인</button>`;
-        lastRepHtml = `<span style="font-size:11.5px">${esc(c)}</span>${more} ${ackBtn}`;
+        const unack = reps.filter(function(r){return r.acknowledged!=1;}).length;
+        const lastTime = esc(String(reps[0].created_at)).slice(5,16);
+        const unackTxt = unack ? ` · <span style="color:var(--amber)">미확인 ${unack}</span>` : '';
+        lastRepHtml = `<span style="font-size:11.5px">${reps.length}건 · 최근 ${lastTime}</span>${unackTxt}`;
       }
       const respCell = (atk && m.status==='pending_approval' && ROLE==='admin') ? `
         <div class="roe-inline">
@@ -377,11 +396,11 @@ async function loadBoard(){
           : `<span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span>`);
       const rowStyle = (m.status==='completed'||m.status==='cancelled') ? ' style="opacity:.6"' : '';
       const canCancel = ROLE==='admin' && m.status!=='completed' && m.status!=='cancelled';
-      const cancelBtn = canCancel ? `<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="cancelMission(${m.id})">취소</button>` : '';
+      const cancelBtn = canCancel ? `<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="cancelMission(${m.id})">임무취소</button>` : '';
       return `<tr${rowStyle}>
         <td><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span></td>
         <td style="font-weight:700;color:${esc(TEAMCOLORS[m.team_id]||'#cfe0f0')}">${esc(teamNo)}팀</td>
-        <td class="mono" style="font-size:11px">${esc(coordText(m.lat,m.lng,m.coord))}</td>
+        <td class="mono" style="font-size:11px" title="${m.target?('표적: '+esc(m.target)):''}">${esc(coordText(m.lat,m.lng,m.coord))}</td>
         <td style="font-size:11px">${missionDistanceLabel(m)}</td>
         <td>${statusCell}</td>
         <td>${respCell}</td>
@@ -392,7 +411,12 @@ async function loadBoard(){
 }
 
 let MAP=null, LG={teams:null,reports:null,fires:null,route:null,missionRoutes:null},
-  layerOn={teams:true,reports:true,fires:true,missionRoutes:true}, TEAM_MARKERS={};
+  layerOn={teams:true,reports:true,fires:true,missionRoutes:true}, TEAM_MARKERS={},
+  MAP_FIRST_FIT=false, LAST_PTS=[];
+function fitAllView(){
+  if(!MAP||!LAST_PTS.length) return;
+  try{ MAP.fitBounds(LAST_PTS,{padding:[30,30],maxZoom:15}); }catch(e){}
+}
 const STATUSCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
 function initMap(){
   if(MAP||typeof L==='undefined') return;
@@ -479,9 +503,16 @@ async function loadMap(){
       if(!rp||!rp.length) return;
       const color=TEAMCOLORS[mr.team_id]||'#E8A33D';
       const teamNo=TEAMNO[mr.team_id]||mr.team_id;
+      const base=TEAMLATLNG[mr.team_id];
       if(rp.length>1){
+        const total=routeTotalDist(rp);
         L.polyline(rp,{color:color,weight:2.5,dashArray:'5,6',opacity:0.85})
-          .bindTooltip(esc(teamNo)+'팀 경로 · '+(mr.type==='attack'?'공격':'정찰'),{sticky:true})
+          .bindTooltip(esc(teamNo)+'팀 경로 · '+(mr.type==='attack'?'공격':'정찰')+' · '+fmtDist(total),{sticky:true})
+          .addTo(LG.missionRoutes);
+      } else if(rp.length===1 && base){
+        const d=haversine(base[0],base[1],rp[0][0],rp[0][1]);
+        L.polyline([base,rp[0]],{color:color,weight:2,dashArray:'2,7',opacity:.7})
+          .bindTooltip(esc(teamNo)+'팀 · 직선 '+fmtDist(d),{sticky:true})
           .addTo(LG.missionRoutes);
       }
       rp.forEach(function(p,i){
@@ -490,7 +521,7 @@ async function loadMap(){
           .addTo(LG.missionRoutes);
       });
     });
-    if(pts.length){ try{ MAP.fitBounds(pts,{padding:[30,30],maxZoom:15}); }catch(e){} }
+    if(pts.length){ LAST_PTS=pts; if(!MAP_FIRST_FIT){ MAP_FIRST_FIT=true; try{ MAP.fitBounds(pts,{padding:[30,30],maxZoom:15}); }catch(e){} } }
   }catch(e){}
 }
 
@@ -502,7 +533,39 @@ function toggleDraw(){
   document.getElementById('drawbtn').innerHTML = DRAW ? '■ 경로 그리기 중지' : '✎ 지도에서 경로 그리기';
   document.getElementById('drawhint').style.display = DRAW ? 'inline' : 'none';
 }
-function onTypeChange(){ clearRoute(); }
+function onTypeChange(){
+  clearRoute();
+  const t=document.getElementById('m_type').value;
+  document.getElementById('m_target_wrap').style.display = t==='attack' ? 'block' : 'none';
+}
+function mgrsPartsToLatLng(zb,sq,e,n){
+  try{
+    zb=(zb||'').trim().toUpperCase(); sq=(sq||'').trim().toUpperCase();
+    e=(e||'').trim(); n=(n||'').trim();
+    if(!zb||!sq||!e||!n) return null;
+    e=e.padStart(5,'0').slice(0,5); n=n.padStart(5,'0').slice(0,5);
+    const pt=mgrs.toPoint(zb+sq+e+n); // [lon,lat]
+    if(!pt||isNaN(pt[0])||isNaN(pt[1])) return null;
+    return [pt[1],pt[0]];
+  }catch(err){ return null; }
+}
+function fillMgrsBoxes(lat,lng,prefix){
+  const s=toMGRS(lat,lng); if(!s) return;
+  const parts=s.split(' '); if(parts.length!==4) return;
+  const z=document.getElementById(prefix+'_zone'), sq=document.getElementById(prefix+'_sq'),
+        e=document.getElementById(prefix+'_e'), n=document.getElementById(prefix+'_n');
+  if(z)z.value=parts[0]; if(sq)sq.value=parts[1]; if(e)e.value=parts[2]; if(n)n.value=parts[3];
+}
+function applyManualMGRS(){
+  const ll=mgrsPartsToLatLng(
+    document.getElementById('m_mgrs_zone').value, document.getElementById('m_mgrs_sq').value,
+    document.getElementById('m_mgrs_e').value, document.getElementById('m_mgrs_n').value);
+  if(!ll){ toast('좌표 형식을 확인하세요 (예: 52S / CG / 12345 / 67890)'); return; }
+  const type=document.getElementById('m_type').value;
+  if(type==='attack'){ ROUTE=[ll]; } else { ROUTE.push(ll); }
+  redrawRoute();
+  if(MAP) MAP.panTo(ll);
+}
 function currentRouteColor(){
   const id=+document.getElementById('m_team').value;
   return TEAMCOLORS[id]||'#E8A33D';
@@ -527,6 +590,7 @@ function redrawRoute(){
   });
   MLINE.setLatLngs(ROUTE); MLINE.setStyle({color:color});
   MLINE.unbindTooltip();
+  if(ROUTE.length){ const last=ROUTE[ROUTE.length-1]; fillMgrsBoxes(last[0],last[1],'m_mgrs'); }
 
   const el=document.getElementById('m_coords');
   const rows=[];
@@ -574,28 +638,54 @@ async function loadDash(){
       <div class="ministat"><span class="n">${d.counts.fire_pending}</span><span class="l">화력요청 대기</span></div>`;
     document.getElementById('teams').innerHTML=(d.teams||[]).map(t=>{
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
-      return `<tr onclick="flashTeam(${t.id})"><td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">${esc(t.team_no)}팀</td>
+      const coordTip=esc(coordText(t.lat,t.lng,t.coord));
+      return `<tr onclick="flashTeam(${t.id})" title="좌표: ${coordTip}"><td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
-        <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordText(t.lat,t.lng,t.coord))}</td><td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
+        <td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
     const sel=document.getElementById('m_team');
     if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; redrawRoute(); }
   }catch(e){ if(e.error==='unauthorized') logout(); }
 }
 async function loadFires(){
   try{ const d=await api('/fire-requests'); const arr=(d.fire_requests||[]).slice(0,8);
-    document.getElementById('fires').innerHTML=arr.length?arr.map(f=>`
-      <div style="border:1px solid var(--line);border-radius:9px;padding:8px 10px">
+    document.getElementById('fires').innerHTML=arr.length?arr.map(f=>{
+      const canAct=(ROLE==='admin'||ROLE==='fire_coord');
+      const decidedInfo = f.status==='decided' ? ` · ${f.fire_time?('예정 '+esc(f.fire_time)):'미정'}` : '';
+      const actions = canAct ? `
+        <div id="fbtns_${f.id}" style="margin-top:6px;display:flex;gap:6px">
+          <button class="btn btn-ghost" onclick="fstat(${f.id},'received')">접수완료</button>
+          <button class="btn btn-ghost" onclick="fstat(${f.id},'held')">보류</button>
+          <button class="btn btn-amber" onclick="showDecideForm(${f.id})">결정</button>
+        </div>
+        <div id="fdecide_${f.id}" style="display:none;margin-top:6px">
+          <input id="ftime_${f.id}" placeholder="사격 예정시간 (예: 14:30, 비우면 미정)" style="margin-bottom:6px">
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" style="flex:1" onclick="cancelDecideForm(${f.id})">취소</button>
+            <button class="btn btn-amber" style="flex:1" onclick="submitDecide(${f.id})">결정 저장</button>
+          </div>
+        </div>` : '';
+      return `<div style="border:1px solid var(--line);border-radius:9px;padding:8px 10px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span style="font-size:12px"><span style="color:${teamColorForNo(TEAMNO[f.team_id]||'')};font-weight:700">${esc(TEAMNO[f.team_id]||f.team_id)}팀</span> · ${esc(f.target||'표적')} · <span class="mono">${esc(coordText(f.lat,f.lng,f.coord))}</span></span>
-          <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${FSTAT[f.status]||f.status}</span></div>
-        ${(ROLE==='admin'||ROLE==='fire_coord')?`<div style="margin-top:6px;display:flex;gap:6px">
-          <button class="btn btn-ghost" onclick="fstat(${f.id},'approved')">승인</button>
-          <button class="btn btn-ghost" onclick="fstat(${f.id},'held')">보류</button>
-          <button class="btn btn-ghost" onclick="fstat(${f.id},'executed')">시행</button></div>`:''}
-      </div>`).join(''):'<div class="muted" style="font-size:12.5px">요청 없음</div>';
+          <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${FSTAT[f.status]||f.status}${decidedInfo}</span></div>
+        ${actions}
+      </div>`;}).join(''):'<div class="muted" style="font-size:12.5px">요청 없음</div>';
   }catch(e){}
 }
-async function fstat(id,status){ try{ await api('/fire-requests/status','POST',{id,status}); loadFires(); }catch(e){alert('권한이 없거나 실패했습니다.');} }
+function showDecideForm(id){
+  const b=document.getElementById('fbtns_'+id); if(b) b.style.display='none';
+  const f=document.getElementById('fdecide_'+id); if(f) f.style.display='block';
+}
+function cancelDecideForm(id){
+  const b=document.getElementById('fbtns_'+id); if(b) b.style.display='flex';
+  const f=document.getElementById('fdecide_'+id); if(f) f.style.display='none';
+}
+async function submitDecide(id){
+  const e=document.getElementById('ftime_'+id);
+  const v=e?e.value.trim():'';
+  try{ await api('/fire-requests/status','POST',{id,status:'decided',fire_time:v||null}); loadFires(); }catch(err){ alert('실패'); }
+}
+async function fstat(id,status){ try{ await api('/fire-requests/status','POST',{id,status,fire_time:null}); loadFires(); }catch(e){alert('권한이 없거나 실패했습니다.');} }
 
 async function loadReports(){
   try{ const d=await api('/reports'); const rs=(d.reports||[]).slice(0,20);
@@ -626,6 +716,8 @@ function hostileActionCell(r, coordStr){
   const locked = at!=='none';
   const coordArg=String(coordStr||'').replace(/'/g,"\\'");
   const latArg = r.lat==null?'null':+r.lat, lngArg = r.lng==null?'null':+r.lng;
+  const targetDesc=`병력${r.troops??0}·트럭${r.trucks??0}·차량${r.vehicles??0}`;
+  const targetArg=targetDesc.replace(/'/g,"\\'");
   const defs=[
     {k:'attack', label:'공격'},
     {k:'hold',   label:'보류'},
@@ -637,44 +729,45 @@ function hostileActionCell(r, coordStr){
     const cls = 'act-btn btn ' + (isSel?'sel':'btn-ghost');
     const dis = locked ? 'disabled' : '';
     const call = b.k==='attack'
-      ? `reportAction(${r.id},'attack',${latArg},${lngArg},'${coordArg}')`
+      ? `reportAction(${r.id},'attack',${latArg},${lngArg},'${coordArg}','${targetArg}')`
       : `reportAction(${r.id},'${b.k}')`;
     return `<button class="${cls}" style="padding:4px 7px;font-size:10px" ${dis} onclick="${call}">${b.label}</button>`;
   }).join('');
   const reopen = locked ? `<div style="margin-top:4px"><button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="reportAction(${r.id},'reset')">🔓 재조치 활성화</button></div>` : '';
   return `<div style="display:flex;flex-wrap:wrap;gap:4px">${btns}</div>${reopen}`;
 }
-async function reportAction(id, action, lat, lng, coord){
+async function reportAction(id, action, lat, lng, coord, targetInfo){
   try{
     await api('/reports/action','POST',{id,action});
-    if(action==='attack'){ prefillAttackTarget(lat,lng,coord); }
+    if(action==='attack'){ prefillAttackTarget(lat,lng,coord,targetInfo); }
     loadReports(); loadDash(); loadBoard(); loadMap();
   }catch(e){ toast('처리 실패'); }
 }
 async function ackReport(id){ try{ await api('/reports/ack','POST',{id}); loadReports(); loadDash(); loadBoard(); }catch(e){alert('실패');} }
 function toast(msg){ const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},2200); }
-function prefillAttackTarget(lat, lng, coord){
+function prefillAttackTarget(lat, lng, coord, targetInfo){
   const typeSel=document.getElementById('m_type');
   typeSel.value='attack'; onTypeChange();
-  document.getElementById('m_coord').value=coord||'';
+  if(targetInfo){ document.getElementById('m_target').value=targetInfo; }
   ROUTE = (lat!=null && lng!=null && !isNaN(lat) && !isNaN(lng)) ? [[+lat,+lng]] : [];
   redrawRoute();
   const sel=document.getElementById('m_team');
   sel.focus();
   sel.classList.add('pulse-highlight');
   sel.addEventListener('change', function stopBlink(){ sel.classList.remove('pulse-highlight'); }, {once:true});
-  toast('🎯 공격 임무 대상 지정됨 — 팀을 선택하고 "임무 하달"을 누르세요');
+  toast('🎯 공격 임무 대상 지정됨(표적정보 반영) — 팀을 선택하고 "임무 하달"을 누르세요');
 }
 
 async function issueMission(){
   const body={team_id:document.getElementById('m_team').value,type:document.getElementById('m_type').value,
-    coord:document.getElementById('m_coord').value,route:document.getElementById('m_route').value};
-  if(body.type==='attack'){ body.method='designated'; }
+    route:document.getElementById('m_route').value};
+  if(body.type==='attack'){ body.method='designated'; body.target=document.getElementById('m_target').value; }
   if(ROUTE.length){ body.route_points=ROUTE; body.lat=ROUTE[0][0]; body.lng=ROUTE[0][1];
-    if(!body.coord){ body.coord=toMGRS(ROUTE[0][0],ROUTE[0][1])||''; } }
+    body.coord=toMGRS(ROUTE[0][0],ROUTE[0][1])||''; }
   try{ const r=await api('/missions','POST',body);
     alert(r.status==='pending_approval'?'공격 임무 생성됨 — 승인·ROE 확인 대기':'임무 하달됨 (경로 '+ROUTE.length+'개 지점)');
-    clearRoute(); document.getElementById('m_coord').value=''; document.getElementById('m_route').value='';
+    clearRoute(); document.getElementById('m_route').value=''; document.getElementById('m_target').value='';
+    ['m_mgrs_zone','m_mgrs_sq','m_mgrs_e','m_mgrs_n'].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=''; });
     if(DRAW) toggleDraw();
     loadDash(); loadMap(); loadBoard();
   }catch(e){ alert(e.error==='forbidden'?'권한이 없습니다 (관리자/팀장).':'하달 실패'); }
