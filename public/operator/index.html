@@ -159,6 +159,24 @@ function mgrsPartsToLatLng(zb,sq,e,n){
     e=(e||'').trim(); n=(n||'').trim();
     if(!zb||!sq||!e||!n) return null;
     e=e.padStart(5,'0').slice(0,5); n=n.padStart(5,'0').slice(0,5);
+    const pt=mgrs.toPoint(zb+sq+e+n); // [lon,lat]
+    if(!pt||isNaN(pt[0])||isNaN(pt[1])) return null;
+    return [pt[1],pt[0]];
+  }catch(err){ return null; }
+}
+function fillMgrsBoxes(lat,lng,prefix){
+  const s=toMGRS(lat,lng); if(!s) return;
+  const parts=s.split(' '); if(parts.length!==4) return;
+  const z=document.getElementById(prefix+'_zone'), sq=document.getElementById(prefix+'_sq'),
+        e=document.getElementById(prefix+'_e'), n=document.getElementById(prefix+'_n');
+  if(z)z.value=parts[0]; if(sq)sq.value=parts[1]; if(e)e.value=parts[2]; if(n)n.value=parts[3];
+}
+function mgrsPartsToLatLng(zb,sq,e,n){
+  try{
+    zb=(zb||'').trim().toUpperCase(); sq=(sq||'').trim().toUpperCase();
+    e=(e||'').trim(); n=(n||'').trim();
+    if(!zb||!sq||!e||!n) return null;
+    e=e.padStart(5,'0').slice(0,5); n=n.padStart(5,'0').slice(0,5);
     const pt=mgrs.toPoint(zb+sq+e+n);
     if(!pt||isNaN(pt[0])||isNaN(pt[1])) return null;
     return [pt[1],pt[0]];
@@ -175,7 +193,7 @@ const TEAMPAL=['#56B4E9','#E69F00','#009E73','#CC79A7','#D55E00','#0072B2','#B0B
 function teamColorForNo(no){ const n=parseInt(no,10); const idx=isNaN(n)?0:Math.abs(n-1)%TEAMPAL.length; return TEAMPAL[idx]; }
 const COMM={good:'양호',weak:'미약',lost:'두절'}, GPS={fixed:'고정',searching:'탐색',none:'없음'};
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
-const FSTAT={received:'접수',reviewing:'검토',approved:'승인',held:'보류',executed:'시행',rejected:'반려'};
+const FSTAT={received:'접수완료',held:'보류',decided:'결정'};
 function sdot(c){return `<span class="dot" style="background:${c}"></span>`}
 function modeBadge(){document.getElementById('rb_mode').className='modeb '+(MODE==='sim'?'mode-sim':'mode-real');
   document.getElementById('rb_mode').textContent=MODE==='sim'?'모의':'실제';}
