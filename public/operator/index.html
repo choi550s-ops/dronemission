@@ -190,6 +190,80 @@ function fillMgrsBoxes(lat,lng,prefix){
   if(z)z.value=parts[0]; if(sq)sq.value=parts[1]; if(e)e.value=parts[2]; if(n)n.value=parts[3];
 }
 const TEAMPAL=['#56B4E9','#E69F00','#009E73','#CC79A7','#D55E00','#0072B2','#B0BEC5','#F0E442'];
+function haversine(lat1,lng1,lat2,lng2){
+  const R=6371000, toRad=function(d){return d*Math.PI/180;};
+  const dLat=toRad(lat2-lat1), dLng=toRad(lng2-lng1);
+  const a=Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLng/2)*Math.sin(dLng/2);
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// ---- position reporting (auto every N minutes, or every N meters moved) ----
+function loadReportSettings(){
+  try{
+    const raw=localStorage.getItem('iuccs_report_settings');
+    if(raw) return Object.assign({enabled:true,mode:'time',minutes:5,meters:200,lastAt:null}, JSON.parse(raw));
+  }catch(e){}
+  return {enabled:true,mode:'time',minutes:5,meters:200,lastAt:null};
+}
+function persistReportSettings(){
+  try{ localStorage.setItem('iuccs_report_settings', JSON.stringify(REPORT_SETTINGS)); }catch(e){}
+}
+let REPORT_SETTINGS=loadReportSettings();
+let REPORT_TIMER=null, REPORT_WATCH=null, LAST_REPORT_POS=null;
+function saveReportSettings(){
+  const enabled=document.getElementById('rs_enabled').checked;
+  const mode=document.querySelector('#rs_mode button.on')?document.querySelector('#rs_mode button.on').dataset.m:'time';
+  const minutes=Math.max(1,+document.getElementById('rs_minutes').value||5);
+  const meters=Math.max(10,+document.getElementById('rs_meters').value||200);
+  REPORT_SETTINGS=Object.assign({},REPORT_SETTINGS,{enabled,mode,minutes,meters});
+  persistReportSettings();
+  toast('위치 보고 설정 저장됨');
+  startAutoReport();
+}
+function stopAutoReport(){
+  if(REPORT_TIMER){ clearInterval(REPORT_TIMER); REPORT_TIMER=null; }
+  if(REPORT_WATCH!=null && navigator.geolocation){ navigator.geolocation.clearWatch(REPORT_WATCH); REPORT_WATCH=null; }
+}
+function startAutoReport(){
+  stopAutoReport();
+  if(!REPORT_SETTINGS.enabled || !navigator.geolocation) return;
+  // report once immediately on connect
+  sendPositionReport('auto');
+  if(REPORT_SETTINGS.mode==='distance'){
+    REPORT_WATCH=navigator.geolocation.watchPosition(function(pos){
+      const la=pos.coords.latitude, ln=pos.coords.longitude;
+      if(!LAST_REPORT_POS || haversine(LAST_REPORT_POS[0],LAST_REPORT_POS[1],la,ln) >= REPORT_SETTINGS.meters){
+        submitPosition(la,ln,'auto');
+      }
+    }, function(){ /* geolocation error — silently skip */ }, {enableHighAccuracy:false, maximumAge:60000});
+  } else {
+    REPORT_TIMER=setInterval(function(){ sendPositionReport('auto'); }, REPORT_SETTINGS.minutes*60*1000);
+  }
+}
+function sendPositionReport(source){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(function(pos){
+    submitPosition(pos.coords.latitude, pos.coords.longitude, source);
+  }, function(){ /* permission denied or unavailable — silently skip */ }, {enableHighAccuracy:false, maximumAge:60000});
+}
+async function submitPosition(lat,lng,source){
+  try{
+    await api('/team-track','POST',{lat,lng,source});
+    LAST_REPORT_POS=[lat,lng];
+    if(source==='auto'){
+      REPORT_SETTINGS.lastAt=new Date().toTimeString().slice(0,8);
+      persistReportSettings();
+      const el=document.getElementById('rs_last'); if(el) el.textContent='마지막 자동보고: '+REPORT_SETTINGS.lastAt;
+    }
+  }catch(e){}
+}
+function manualPositionReport(){
+  if(!navigator.geolocation){ toast('위치 정보를 사용할 수 없습니다'); return; }
+  navigator.geolocation.getCurrentPosition(function(pos){
+    submitPosition(pos.coords.latitude,pos.coords.longitude,'manual');
+    toast('📍 현재 위치 보고됨');
+  }, function(){ toast('위치 권한이 거부되었거나 가져올 수 없습니다'); }, {enableHighAccuracy:false, maximumAge:0});
+}
 function teamColorForNo(no){ const n=parseInt(no,10); const idx=isNaN(n)?0:Math.abs(n-1)%TEAMPAL.length; return TEAMPAL[idx]; }
 const COMM={good:'양호',weak:'미약',lost:'두절'}, GPS={fixed:'고정',searching:'탐색',none:'없음'};
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
@@ -220,6 +294,7 @@ function enterApp(){
   const roleKo={admin:'관리자',leader:'팀장',operator:'운용자',fire_coord:'화력협조',observer:'참관'}[SESS.role]||SESS.role;
   document.getElementById('rb_role').textContent=roleKo;
   modeBadge(); startClock(); go('home');
+  startAutoReport();
 }
 function startClock(){setInterval(()=>{const n=new Date();
   document.getElementById('rb_clk').textContent=n.toTimeString().slice(0,8);},1000);}
@@ -353,6 +428,29 @@ async function renderDrones(){
     const members=mm.members||[];
     const drones=dd.drones||[];
     v.innerHTML = `<h2>팀관리</h2>
+      <div class="card">
+        <div class="lbl">위치 보고 설정</div>
+        <label class="row" style="font-size:13px;margin-bottom:9px">
+          <input type="checkbox" id="rs_enabled" style="width:18px;height:18px;flex:none" ${REPORT_SETTINGS.enabled?'checked':''}> 자동 위치보고 사용
+        </label>
+        <div class="seg" id="rs_mode" style="margin-bottom:9px">
+          <button data-m="time" class="${REPORT_SETTINGS.mode==='time'?'on':''}">시간 기준</button>
+          <button data-m="distance" class="${REPORT_SETTINGS.mode==='distance'?'on':''}">거리 기준</button>
+        </div>
+        <div id="rs_time_wrap" style="${REPORT_SETTINGS.mode==='time'?'':'display:none'}">
+          <div class="lbl">보고 주기 (분)</div>
+          <input id="rs_minutes" type="number" min="1" value="${REPORT_SETTINGS.minutes}" style="margin-bottom:9px">
+        </div>
+        <div id="rs_dist_wrap" style="${REPORT_SETTINGS.mode==='distance'?'':'display:none'}">
+          <div class="lbl">이동거리 기준 (m)</div>
+          <input id="rs_meters" type="number" min="10" value="${REPORT_SETTINGS.meters}" style="margin-bottom:9px">
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost" style="flex:1;padding:9px" onclick="manualPositionReport()">📍 지금 위치 보고</button>
+          <button class="btn btn-amber" style="flex:1;padding:9px" onclick="saveReportSettings()">설정 저장</button>
+        </div>
+        <div class="geo" id="rs_last" style="margin-top:8px">${REPORT_SETTINGS.lastAt?('마지막 자동보고: '+REPORT_SETTINGS.lastAt):'아직 자동보고 없음'}</div>
+      </div>
       <div class="lbl" style="margin-top:2px">팀원 현황</div>
       <div id="memberlist" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
       <div class="card">
@@ -371,6 +469,14 @@ async function renderDrones(){
       </div>`;
     renderMemberList(members);
     document.getElementById('dronelist').innerHTML = drones.map(function(dr){ return droneCard(dr); }).join('');
+    document.querySelectorAll('#rs_mode button').forEach(function(b){
+      b.onclick=function(){
+        document.querySelectorAll('#rs_mode button').forEach(function(x){x.classList.remove('on');});
+        b.classList.add('on');
+        document.getElementById('rs_time_wrap').style.display = b.dataset.m==='time' ? 'block' : 'none';
+        document.getElementById('rs_dist_wrap').style.display = b.dataset.m==='distance' ? 'block' : 'none';
+      };
+    });
   }catch(e){ v.innerHTML=err(e); }
 }
 function modelOptions(selId){

@@ -299,6 +299,20 @@ function route($path, $method)
         json_out(array('ok' => true));
     }
 
+    if ($path === '/api/team-track' && $method === 'POST') {
+        $s   = Auth::require_auth();
+        $b   = body_json();
+        $tid = ($s['role'] === 'admin') ? pval($b, 'team_id') : $s['team_id'];
+        $lat = pval($b, 'lat');
+        $lng = pval($b, 'lng');
+        if (!$tid || $lat === null || $lng === null) { json_out(array('error' => 'lat_lng_required'), 400); }
+        $src = (pval($b, 'source') === 'manual') ? 'manual' : 'auto';
+        $pdo->prepare("INSERT INTO iuccs_team_tracks(team_id, lat, lng, source) VALUES (?,?,?,?)")
+            ->execute(array($tid, $lat, $lng, $src));
+        $pdo->prepare("UPDATE iuccs_teams SET lat = ?, lng = ? WHERE id = ?")->execute(array($lat, $lng, $tid));
+        json_out(array('ok' => true));
+    }
+
     if ($path === '/api/missions/board') {
         Auth::require_auth();
         $missions = $pdo->query("SELECT * FROM iuccs_missions ORDER BY issued_at DESC LIMIT 100")->fetchAll();

@@ -488,6 +488,11 @@ async function loadMap(){
       }
       m.bindTooltip(tipHtml,{direction:'top',sticky:true,className:'hovertip'});
       m.bindPopup('<b>정찰 보고</b> ('+esc(teamNo)+'팀)<br>'+esc(targetInfo)+'<br><span style="font-family:monospace">'+esc(coordText(r.lat,r.lng,r.coord))+'</span>');
+      if(r.hostile==1){
+        m.on('click',function(){
+          if(DRAW){ addRoutePoint(+r.lat,+r.lng); toast('🔺 적 식별 좌표로 경로점 지정됨'); }
+        });
+      }
       m.addTo(LG.reports);
       pts.push([+r.lat,+r.lng]);
     });
