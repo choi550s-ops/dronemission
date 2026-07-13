@@ -392,9 +392,43 @@ function doLogout(){
 }
 
 // ---- MAP helpers ----
-const TILE='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const TCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
-function darkTiles(map){L.tileLayer(TILE,{maxZoom:19,attribution:'Esri, Maxar, Earthstar Geographics'}).addTo(map);}
+const OP_MAP_STYLES={
+  dark:{icon:'🌙', url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', opts:{subdomains:'abcd', attribution:'&copy; OSM &copy; CARTO'}},
+  topo:{icon:'🗺', url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', opts:{subdomains:'abc', attribution:'&copy; OpenTopoMap contributors'}},
+  sat:{icon:'🛰', url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', opts:{attribution:'Esri, Maxar, Earthstar Geographics'}},
+};
+const OP_STYLE_ORDER=['sat','dark','topo'];
+function getSavedOpStyle(){
+  try{ const s=localStorage.getItem('iuccs_op_map_style'); if(OP_MAP_STYLES[s]) return s; }catch(e){}
+  return 'sat';
+}
+function darkTiles(map){
+  const style=getSavedOpStyle();
+  const st=OP_MAP_STYLES[style];
+  const layer=L.tileLayer(st.url, Object.assign({maxZoom:19}, st.opts)).addTo(map);
+  map._opBaseLayer=layer; map._opStyle=style;
+}
+function addStyleToggleBtn(map, containerId){
+  const container=document.getElementById(containerId);
+  if(!container||typeof L==='undefined') return;
+  const btn=document.createElement('button');
+  btn.type='button'; btn.className='locate-btn'; btn.style.top='10px'; btn.style.left='10px'; btn.style.right='auto';
+  btn.title='지도 스타일 전환';
+  btn.innerHTML=OP_MAP_STYLES[map._opStyle||getSavedOpStyle()].icon;
+  L.DomEvent.disableClickPropagation(btn);
+  btn.onclick=function(){
+    const cur=map._opStyle||getSavedOpStyle();
+    const next=OP_STYLE_ORDER[(OP_STYLE_ORDER.indexOf(cur)+1)%OP_STYLE_ORDER.length];
+    if(map._opBaseLayer) map.removeLayer(map._opBaseLayer);
+    const st=OP_MAP_STYLES[next];
+    map._opBaseLayer=L.tileLayer(st.url, Object.assign({maxZoom:19}, st.opts)).addTo(map);
+    map._opStyle=next;
+    btn.innerHTML=st.icon;
+    try{ localStorage.setItem('iuccs_op_map_style', next); }catch(e){}
+  };
+  container.appendChild(btn);
+}
 function addLocateBtn(map, containerId, onFound){
   const container=document.getElementById(containerId);
   if(!container||typeof L==='undefined') return;
@@ -429,6 +463,7 @@ function mountPicker(elId,onSet){
   });
   setTimeout(function(){map.invalidateSize();},250);
   addLocateBtn(map, elId, function(la,ln){ place(la,ln); onSet(la,ln); });
+  addStyleToggleBtn(map, elId);
   return {map:map, place:place};
 }
 function diamondIcon(blink){ return L.divIcon({className:'diamond-icon',html:'<div class="diamond'+(blink?' blinking':'')+'"></div>',iconSize:[20,20],iconAnchor:[10,10]}); }
@@ -438,6 +473,7 @@ async function homeMap(){
   const map=L.map('home_map',{zoomControl:false,attributionControl:false}).setView([37.555,127.01],12);
   darkTiles(map);
   addLocateBtn(map,'home_map');
+  addStyleToggleBtn(map,'home_map');
   try{
     const d=await api('/map'); const pts=[];
     const teamNoOf={}; (d.teams||[]).forEach(function(t){ teamNoOf[t.id]=t.team_no; });
@@ -788,6 +824,7 @@ function mountRouteMap(elId,pts){
   try{ map.fitBounds(pts,{padding:[24,24],maxZoom:15}); }catch(e){}
   setTimeout(function(){map.invalidateSize();},250);
   addLocateBtn(map, elId);
+  addStyleToggleBtn(map, elId);
 }
 
 
