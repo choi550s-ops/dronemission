@@ -392,9 +392,9 @@ function doLogout(){
 }
 
 // ---- MAP helpers ----
-const TILE='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TILE='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const TCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
-function darkTiles(map){L.tileLayer(TILE,{maxZoom:19,subdomains:'abcd',attribution:'&copy; OSM &copy; CARTO'}).addTo(map);}
+function darkTiles(map){L.tileLayer(TILE,{maxZoom:19,attribution:'Esri, Maxar, Earthstar Geographics'}).addTo(map);}
 function addLocateBtn(map, containerId, onFound){
   const container=document.getElementById(containerId);
   if(!container||typeof L==='undefined') return;
