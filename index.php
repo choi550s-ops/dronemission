@@ -196,6 +196,29 @@ function route($path, $method)
         log_activity('user#' . $s['user_id'], 'drone_model_create', 'drone_model', $pdo->lastInsertId(), $name);
         json_out(array('id' => $pdo->lastInsertId()), 201);
     }
+    if ($path === '/api/drone-models/update' && $method === 'POST') {
+        $s    = Auth::require_auth(array('admin'));
+        $b    = body_json();
+        $id   = pval($b, 'id');
+        $name = trim(pval($b, 'name', ''));
+        $cat  = (pval($b, 'category') === 'recon') ? 'recon' : 'attack';
+        if (!$id || $name === '') { json_out(array('error' => 'fields_required'), 400); }
+        $pdo->prepare("UPDATE iuccs_drone_models SET name = ?, category = ? WHERE id = ?")->execute(array($name, $cat, $id));
+        log_activity('user#' . $s['user_id'], 'drone_model_update', 'drone_model', $id, $name);
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/drone-models/delete' && $method === 'POST') {
+        $s  = Auth::require_auth(array('admin'));
+        $b  = body_json();
+        $id = pval($b, 'id');
+        if (!$id) { json_out(array('error' => 'id_required'), 400); }
+        // drones.model_id has no FK constraint (by design); drones referencing this
+        // model simply show no model name/category afterwards rather than failing.
+        $pdo->prepare("UPDATE iuccs_drones SET model_id = NULL WHERE model_id = ?")->execute(array($id));
+        $pdo->prepare("DELETE FROM iuccs_drone_models WHERE id = ?")->execute(array($id));
+        log_activity('user#' . $s['user_id'], 'drone_model_delete', 'drone_model', $id, null);
+        json_out(array('ok' => true));
+    }
 
     if ($path === '/api/drones/update' && $method === 'POST') {
         $s  = Auth::require_auth();
@@ -213,14 +236,18 @@ function route($path, $method)
             'status'      => array('available','maintenance','destroyed'),
         );
         $sets = array(); $vals = array();
-        foreach (array('model_id','max_flight_min','battery_count','range_km','battery_pct','comm_status','gps_status','status','note') as $f) {
+        foreach (array('code','model_id','max_flight_min','battery_count','range_km','battery_pct','comm_status','gps_status','status','note') as $f) {
             if (!array_key_exists($f, $b)) { continue; }
             if (isset($enum[$f]) && !in_array($b[$f], $enum[$f], true)) { continue; }
             $sets[] = "$f = ?"; $vals[] = $b[$f];
         }
         if (!$sets) { json_out(array('error' => 'no_fields'), 400); }
         $vals[] = $id;
-        $pdo->prepare("UPDATE iuccs_drones SET " . implode(', ', $sets) . " WHERE id = ?")->execute($vals);
+        try {
+            $pdo->prepare("UPDATE iuccs_drones SET " . implode(', ', $sets) . " WHERE id = ?")->execute($vals);
+        } catch (Exception $e) {
+            json_out(array('error' => 'duplicate_or_invalid'), 400);
+        }
         log_activity('team#' . pval($s, 'team_id', '?'), 'drone_update', 'drone', $id, null);
         json_out(array('ok' => true));
     }

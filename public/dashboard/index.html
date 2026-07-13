@@ -211,7 +211,10 @@
       <div class="ministats" id="counts"></div>
       <div class="between" style="margin-bottom:2px">
         <h2 style="margin:0">팀 · 자산 현황</h2>
-        <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_team_add')">+ 팀 추가</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openDroneModelModal()">⚙ 기체종류 관리</button>
+          <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_team_add')">+ 팀 추가</button>
+        </div>
       </div>
       <table><thead><tr><th>팀</th><th>상태</th><th>기체</th></tr></thead>
         <tbody id="teams"></tbody></table>
@@ -377,6 +380,27 @@
         <button class="btn btn-ghost" onclick="closeModalEl('modal_fires')">✕ 닫기</button>
       </div></div>
     <div class="modal-body" id="fires_modal" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<div id="modal_drone_models" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_drone_models')">
+  <div class="modal-box" style="width:min(480px,92vw)">
+    <div class="modal-head"><h2 style="margin:0">⚙ 기체종류 관리</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_drone_models')">✕ 닫기</button></div>
+    <div class="modal-body">
+      <div class="muted" style="font-size:11.5px;margin-bottom:10px">여기서 추가·수정·삭제한 종류는 모든 팀의 기체 등록 화면에서 공통으로 선택됩니다.</div>
+      <div id="dm_list" style="display:flex;flex-direction:column;gap:7px;margin-bottom:14px"></div>
+      <div class="card">
+        <div class="lbl">새 기체종류 추가</div>
+        <div style="display:flex;gap:6px">
+          <input id="dm_new_name" placeholder="장비명 (예: 정찰용 쿼드콥터)" style="flex:1.4">
+          <select id="dm_new_cat" style="flex:1">
+            <option value="attack">공격</option>
+            <option value="recon">정찰</option>
+          </select>
+        </div>
+        <button class="btn btn-amber" style="width:100%;padding:9px;margin-top:8px" onclick="createDroneModel()">+ 추가</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -850,6 +874,76 @@ function closeTeamDrawer(){
   document.getElementById('teamPanel').style.display='none';
   TD_TEAM_ID=null; EDITING_MEMBER_D=null;
 }
+let EDITING_MODEL_D=null;
+const DM_CATLBL={attack:'공격',recon:'정찰'};
+async function openDroneModelModal(){
+  openModalEl('modal_drone_models');
+  await loadDroneModelList();
+}
+async function loadDroneModelList(){
+  const el=document.getElementById('dm_list');
+  el.innerHTML='<span class="muted" style="font-size:11.5px">불러오는 중…</span>';
+  try{
+    const d=await api('/drone-models');
+    DRONE_MODELS_D=d.models||[];
+    el.innerHTML = DRONE_MODELS_D.length ? DRONE_MODELS_D.map(function(mo){
+      if(EDITING_MODEL_D===mo.id){
+        return `<div class="card" style="padding:9px 10px">
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input id="dm_edit_name_${mo.id}" value="${esc(mo.name)}" style="flex:1.4">
+            <select id="dm_edit_cat_${mo.id}" style="flex:1">
+              <option value="attack" ${mo.category==='attack'?'selected':''}>공격</option>
+              <option value="recon" ${mo.category==='recon'?'selected':''}>정찰</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" style="flex:1" onclick="cancelEditModelD()">취소</button>
+            <button class="btn btn-amber" style="flex:1" onclick="saveDroneModelD(${mo.id})">저장</button>
+          </div></div>`;
+      }
+      return `<div class="card between" style="padding:9px 10px">
+        <span style="font-size:12.5px"><span class="chip" style="background:${mo.category==='attack'?'rgba(226,74,59,.16);color:#ff8579':'rgba(59,130,214,.16);color:#8fc0ff'}">${DM_CATLBL[mo.category]}</span>
+          <span style="margin-left:7px;font-weight:700;color:var(--ink)">${esc(mo.name)}</span></span>
+        <span style="display:flex;gap:5px">
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10.5px" onclick="startEditModelD(${mo.id})">수정</button>
+          <button class="btn btn-ghost" style="padding:3px 8px;font-size:10.5px" onclick="deleteDroneModelD(${mo.id})">삭제</button>
+        </span></div>`;
+    }).join('') : '<div class="muted" style="font-size:11.5px">등록된 기체종류가 없습니다.</div>';
+  }catch(e){ el.innerHTML='<span class="muted" style="font-size:11.5px">불러오기 실패</span>'; }
+}
+function startEditModelD(id){ EDITING_MODEL_D=id; loadDroneModelList(); }
+function cancelEditModelD(){ EDITING_MODEL_D=null; loadDroneModelList(); }
+async function saveDroneModelD(id){
+  const name=document.getElementById('dm_edit_name_'+id).value.trim();
+  const category=document.getElementById('dm_edit_cat_'+id).value;
+  if(!name){ toast('장비명을 입력하세요'); return; }
+  try{
+    await api('/drone-models/update','POST',{id,name,category});
+    EDITING_MODEL_D=null; toast('기체종류 수정됨');
+    loadDroneModelList();
+    if(TD_TEAM_ID!=null) loadTeamDrawer(TD_TEAM_ID);
+  }catch(e){ toast('수정 실패'); }
+}
+async function deleteDroneModelD(id){
+  if(!confirm('이 기체종류를 삭제하시겠습니까?\n이 종류로 등록된 기체는 종류 미지정 상태가 됩니다.')) return;
+  try{
+    await api('/drone-models/delete','POST',{id});
+    toast('기체종류 삭제됨');
+    loadDroneModelList();
+    if(TD_TEAM_ID!=null) loadTeamDrawer(TD_TEAM_ID);
+  }catch(e){ toast('삭제 실패'); }
+}
+async function createDroneModel(){
+  const name=document.getElementById('dm_new_name').value.trim();
+  const category=document.getElementById('dm_new_cat').value;
+  if(!name){ toast('장비명을 입력하세요'); return; }
+  try{
+    await api('/drone-models/create','POST',{name,category});
+    document.getElementById('dm_new_name').value='';
+    toast('기체종류 추가됨');
+    loadDroneModelList();
+  }catch(e){ toast('추가 실패'); }
+}
 function modelOptionsD(selId){
   const groups={attack:[],recon:[]};
   DRONE_MODELS_D.forEach(function(m){ (groups[m.category]||groups.attack).push(m); });
@@ -904,7 +998,7 @@ async function loadTeamDrawer(id){
           <div class="card">
             <div class="lbl">신규 기체 등록</div>
             <div style="display:flex;gap:6px">
-              <input id="td_nd_code" placeholder="코드 (예: 1호기)" style="flex:1">
+              <input id="td_nd_code" placeholder="호기 (예: 1호기)" style="flex:1">
               <select id="td_nd_model" style="flex:1">${modelOptionsD()}</select>
             </div>
             <button class="btn btn-ghost" style="padding:8px;width:100%;margin-top:8px" onclick="createDroneD(${id})">+ 기체 추가</button>
@@ -976,12 +1070,15 @@ async function addMemberD(tid){
   catch(e){ toast('추가 실패'); }
 }
 function droneCardD(dr){
-  const catTxt = dr.model_category ? ' · '+CATLBL_D[dr.model_category] : '';
+  const catColor = dr.model_category==='attack' ? 'rgba(226,74,59,.16);color:#ff8579' : (dr.model_category==='recon' ? 'rgba(59,130,214,.16);color:#8fc0ff' : 'rgba(124,144,168,.16);color:var(--muted)');
   return `<div class="card" id="tdc_${dr.id}" style="padding:10px 12px">
-    <div class="between" style="margin-bottom:8px"><span class="val" style="color:var(--ink);font-weight:700;font-size:13px">✈️ ${esc(dr.code)}</span>
-      <span class="muted" style="font-size:11px">${esc(dr.model_name||'')}${catTxt}</span></div>
+    <div class="between" style="margin-bottom:8px">
+      <span id="tdr_catbadge_${dr.id}" class="chip" style="background:${catColor}">${dr.model_category?CATLBL_D[dr.model_category]:'미지정'}</span>
+      <input id="tdr_code_${dr.id}" value="${esc(dr.code)}" placeholder="호기 (예: 1호기)" style="width:120px;text-align:right;font-weight:700;color:var(--ink);font-size:13px">
+    </div>
+    <div class="lbl">장비명</div>
+    <select id="tdr_model_${dr.id}" style="margin-bottom:7px" onchange="updateDroneCatBadgeD(${dr.id}, this.value)">${modelOptionsD(dr.model_id)}</select>
     <div style="display:flex;gap:7px;margin-bottom:7px">
-      <select id="tdr_model_${dr.id}" style="flex:1.3">${modelOptionsD(dr.model_id)}</select>
       <select id="tdr_stat_${dr.id}" style="flex:1">
         <option value="available" ${dr.status==='available'?'selected':''}>가용</option>
         <option value="maintenance" ${dr.status==='maintenance'?'selected':''}>정비</option>
@@ -995,6 +1092,15 @@ function droneCardD(dr){
     </div>
   </div>`;
 }
+function updateDroneCatBadgeD(id, modelId){
+  const badge=document.getElementById('tdr_catbadge_'+id);
+  if(!badge) return;
+  const mo=DRONE_MODELS_D.find(function(m){ return (''+m.id)===(''+modelId); });
+  const cat=mo?mo.category:null;
+  badge.textContent=cat?CATLBL_D[cat]:'미지정';
+  badge.style.background=cat==='attack'?'rgba(226,74,59,.16)':(cat==='recon'?'rgba(59,130,214,.16)':'rgba(124,144,168,.16)');
+  badge.style.color=cat==='attack'?'#ff8579':(cat==='recon'?'#8fc0ff':'var(--muted)');
+}
 async function deleteDroneD(id){
   if(!confirm('이 기체를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
   try{ await api('/drones/delete','POST',{id}); toast('기체 삭제됨'); loadTeamDrawer(TD_TEAM_ID); loadDash(); }
@@ -1003,9 +1109,9 @@ async function deleteDroneD(id){
 async function saveDroneD(id){
   const g=k=>document.getElementById(k+'_'+id).value;
   try{
-    await api('/drones/update','POST',{id,model_id:+g('tdr_model')||null,status:g('tdr_stat'),note:g('tdr_note')});
-    toast('기체 정보 저장됨'); loadDash();
-  }catch(e){ toast('저장 실패'); }
+    await api('/drones/update','POST',{id,code:g('tdr_code'),model_id:+g('tdr_model')||null,status:g('tdr_stat'),note:g('tdr_note')});
+    toast('기체 정보 저장됨'); loadTeamDrawer(TD_TEAM_ID); loadDash();
+  }catch(e){ toast(e.error==='duplicate_or_invalid'?'저장 실패 (중복된 호기)':'저장 실패'); }
 }
 async function createDroneD(tid){
   const code=document.getElementById('td_nd_code').value.trim();

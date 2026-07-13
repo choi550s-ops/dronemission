@@ -620,7 +620,7 @@ async function renderDrones(){
       <div id="dronelist" style="display:flex;flex-direction:column;gap:10px">${drones.length?'':'<div class="card muted">배정된 기체가 없습니다.</div>'}</div>
       <div class="card" style="margin-top:4px">
         <div class="lbl">신규 기체 등록</div>
-        <input id="nd_code" placeholder="기체 코드 (예: 1호기)" style="margin-bottom:8px">
+        <input id="nd_code" placeholder="호기 (예: 1호기)" style="margin-bottom:8px">
         <select id="nd_model" style="margin-bottom:8px">${modelOptions()}</select>
         <button class="btn btn-ghost" style="padding:10px" onclick="createDrone()">+ 기체 추가</button>
       </div>`;
@@ -690,12 +690,14 @@ async function addMember(){
   catch(e){ toast('추가 실패'); }
 }
 function droneCard(dr){
-  const catTxt = dr.model_category ? ' · '+CATLBL[dr.model_category] : '';
+  const catColor = dr.model_category==='attack' ? 'rgba(226,74,59,.16);color:#ff8579' : (dr.model_category==='recon' ? 'rgba(59,130,214,.16);color:#8fc0ff' : 'rgba(124,144,168,.16);color:var(--muted)');
   return `<div class="card" id="dc_${dr.id}">
-    <div class="between" style="margin-bottom:9px"><span class="val">✈️ ${esc(dr.code)}</span>
-      <span class="muted" style="font-size:11.5px">${esc(dr.model_name||'')}${catTxt}</span></div>
-    <div class="lbl">모델</div>
-    <select id="dr_model_${dr.id}" style="margin-bottom:9px">${modelOptions(dr.model_id)}</select>
+    <div class="between" style="margin-bottom:9px">
+      <span id="dr_catbadge_${dr.id}" class="chip" style="background:${catColor}">${dr.model_category?CATLBL[dr.model_category]:'미지정'}</span>
+      <input id="dr_code_${dr.id}" value="${esc(dr.code)}" placeholder="호기 (예: 1호기)" style="width:130px;text-align:right;font-weight:700;color:var(--ink)">
+    </div>
+    <div class="lbl">장비명</div>
+    <select id="dr_model_${dr.id}" style="margin-bottom:9px" onchange="updateDroneCatBadge(${dr.id}, this.value)">${modelOptions(dr.model_id)}</select>
     <div class="lbl">운용 가능상태</div>
     <select id="dr_stat_${dr.id}" style="margin-bottom:9px">
       <option value="available" ${dr.status==='available'?'selected':''}>가용</option>
@@ -710,6 +712,15 @@ function droneCard(dr){
     </div>
   </div>`;
 }
+function updateDroneCatBadge(id, modelId){
+  const badge=document.getElementById('dr_catbadge_'+id);
+  if(!badge) return;
+  const mo=DRONE_MODELS.find(function(m){ return (''+m.id)===(''+modelId); });
+  const cat=mo?mo.category:null;
+  badge.textContent=cat?CATLBL[cat]:'미지정';
+  badge.style.background=cat==='attack'?'rgba(226,74,59,.16)':(cat==='recon'?'rgba(59,130,214,.16)':'rgba(124,144,168,.16)');
+  badge.style.color=cat==='attack'?'#ff8579':(cat==='recon'?'#8fc0ff':'var(--muted)');
+}
 async function deleteDrone(id){
   if(!confirm('이 기체를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
   try{ await api('/drones/delete','POST',{id}); toast('기체 삭제됨'); renderDrones(); }
@@ -718,9 +729,9 @@ async function deleteDrone(id){
 async function saveDrone(id){
   const g=k=>document.getElementById(k+'_'+id).value;
   try{
-    await api('/drones/update','POST',{id,model_id:+g('dr_model')||null,status:g('dr_stat'),note:g('dr_note')});
-    toast('기체 정보 저장됨');
-  }catch(e){ toast('저장 실패'); }
+    await api('/drones/update','POST',{id,code:g('dr_code'),model_id:+g('dr_model')||null,status:g('dr_stat'),note:g('dr_note')});
+    toast('기체 정보 저장됨'); renderDrones();
+  }catch(e){ toast(e.error==='duplicate_or_invalid'?'저장 실패 (중복된 호기)':'저장 실패'); }
 }
 async function createDrone(){
   const code=document.getElementById('nd_code').value.trim();
