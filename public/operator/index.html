@@ -620,7 +620,7 @@ async function renderDrones(){
       <div id="dronelist" style="display:flex;flex-direction:column;gap:10px">${drones.length?'':'<div class="card muted">배정된 기체가 없습니다.</div>'}</div>
       <div class="card" style="margin-top:4px">
         <div class="lbl">신규 기체 등록</div>
-        <input id="nd_code" placeholder="호기 (예: 1호기)" style="margin-bottom:8px">
+        <input id="nd_code" placeholder="호수 (예: 1호수)" style="margin-bottom:8px">
         <select id="nd_model" style="margin-bottom:8px">${modelOptions()}</select>
         <button class="btn btn-ghost" style="padding:10px" onclick="createDrone()">+ 기체 추가</button>
       </div>`;
@@ -694,7 +694,7 @@ function droneCard(dr){
   return `<div class="card" id="dc_${dr.id}">
     <div class="between" style="margin-bottom:9px">
       <span id="dr_catbadge_${dr.id}" class="chip" style="background:${catColor}">${dr.model_category?CATLBL[dr.model_category]:'미지정'}</span>
-      <input id="dr_code_${dr.id}" value="${esc(dr.code)}" placeholder="호기 (예: 1호기)" style="width:130px;text-align:right;font-weight:700;color:var(--ink)">
+      <input id="dr_code_${dr.id}" value="${esc(dr.code)}" placeholder="호수 (예: 1호수)" style="width:130px;text-align:right;font-weight:700;color:var(--ink)">
     </div>
     <div class="lbl">장비명</div>
     <select id="dr_model_${dr.id}" style="margin-bottom:9px" onchange="updateDroneCatBadge(${dr.id}, this.value)">${modelOptions(dr.model_id)}</select>
@@ -731,7 +731,7 @@ async function saveDrone(id){
   try{
     await api('/drones/update','POST',{id,code:g('dr_code'),model_id:+g('dr_model')||null,status:g('dr_stat'),note:g('dr_note')});
     toast('기체 정보 저장됨'); renderDrones();
-  }catch(e){ toast(e.error==='duplicate_or_invalid'?'저장 실패 (중복된 호기)':'저장 실패'); }
+  }catch(e){ toast(e.error==='duplicate_or_invalid'?'저장 실패 (중복된 호수)':'저장 실패'); }
 }
 async function createDrone(){
   const code=document.getElementById('nd_code').value.trim();

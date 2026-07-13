@@ -998,7 +998,7 @@ async function loadTeamDrawer(id){
           <div class="card">
             <div class="lbl">신규 기체 등록</div>
             <div style="display:flex;gap:6px">
-              <input id="td_nd_code" placeholder="호기 (예: 1호기)" style="flex:1">
+              <input id="td_nd_code" placeholder="호수 (예: 1호수)" style="flex:1">
               <select id="td_nd_model" style="flex:1">${modelOptionsD()}</select>
             </div>
             <button class="btn btn-ghost" style="padding:8px;width:100%;margin-top:8px" onclick="createDroneD(${id})">+ 기체 추가</button>
@@ -1074,7 +1074,7 @@ function droneCardD(dr){
   return `<div class="card" id="tdc_${dr.id}" style="padding:10px 12px">
     <div class="between" style="margin-bottom:8px">
       <span id="tdr_catbadge_${dr.id}" class="chip" style="background:${catColor}">${dr.model_category?CATLBL_D[dr.model_category]:'미지정'}</span>
-      <input id="tdr_code_${dr.id}" value="${esc(dr.code)}" placeholder="호기 (예: 1호기)" style="width:120px;text-align:right;font-weight:700;color:var(--ink);font-size:13px">
+      <input id="tdr_code_${dr.id}" value="${esc(dr.code)}" placeholder="호수 (예: 1호수)" style="width:120px;text-align:right;font-weight:700;color:var(--ink);font-size:13px">
     </div>
     <div class="lbl">장비명</div>
     <select id="tdr_model_${dr.id}" style="margin-bottom:7px" onchange="updateDroneCatBadgeD(${dr.id}, this.value)">${modelOptionsD(dr.model_id)}</select>
@@ -1111,7 +1111,7 @@ async function saveDroneD(id){
   try{
     await api('/drones/update','POST',{id,code:g('tdr_code'),model_id:+g('tdr_model')||null,status:g('tdr_stat'),note:g('tdr_note')});
     toast('기체 정보 저장됨'); loadTeamDrawer(TD_TEAM_ID); loadDash();
-  }catch(e){ toast(e.error==='duplicate_or_invalid'?'저장 실패 (중복된 호기)':'저장 실패'); }
+  }catch(e){ toast(e.error==='duplicate_or_invalid'?'저장 실패 (중복된 호수)':'저장 실패'); }
 }
 async function createDroneD(tid){
   const code=document.getElementById('td_nd_code').value.trim();
