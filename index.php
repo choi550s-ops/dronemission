@@ -357,6 +357,19 @@ function route($path, $method)
         log_activity('user#' . $s['user_id'], 'team_delete', 'team', $id, null);
         json_out(array('ok' => true));
     }
+    if ($path === '/api/teams/status' && $method === 'POST') {
+        $s      = Auth::require_auth();
+        $b      = body_json();
+        $tid    = ($s['role'] === 'admin') ? pval($b, 'team_id', $s['team_id']) : $s['team_id'];
+        $allowed = array('unavailable', 'preparing', 'ready', 'on_mission');
+        $status = pval($b, 'status', '');
+        if (!$tid) { json_out(array('error' => 'team_required'), 400); }
+        if (!in_array($status, $allowed, true)) { json_out(array('error' => 'invalid_status'), 400); }
+        $pdo->prepare("UPDATE iuccs_teams SET status = ? WHERE id = ?")->execute(array($status, $tid));
+        $actor = ($s['role'] === 'admin') ? ('user#' . $s['user_id']) : ('team#' . $tid);
+        log_activity($actor, 'team_status_update', 'team', $tid, $status);
+        json_out(array('ok' => true));
+    }
 
     if ($path === '/api/team-track' && $method === 'POST') {
         $s   = Auth::require_auth();

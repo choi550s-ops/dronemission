@@ -40,6 +40,8 @@
   .seg button{flex:1;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13.5px;
     padding:9px;border-radius:7px;cursor:pointer;font-family:inherit}
   .seg button.on{background:var(--navy);color:#fff}
+  .status-chip{flex:1;border:1.5px solid;background:transparent;font-weight:800;font-size:11px;
+    padding:9px 2px;border-radius:8px;cursor:pointer;font-family:inherit;transition:.15s}
   .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;height:calc(64px + env(safe-area-inset-bottom, 0px));
     z-index:40;
     padding-bottom:env(safe-area-inset-bottom, 0px);
@@ -520,8 +522,12 @@ async function renderHome(){
   const v=document.getElementById('view');
   v.innerHTML='<div class="muted">불러오는 중…</div>';
   try{
-    const d=await api('/drones?team_id='+(SESS.team_id||''));
+    const [d, mapD] = await Promise.all([
+      api('/drones?team_id='+(SESS.team_id||'')),
+      api('/map'),
+    ]);
     const drones=d.drones||[];
+    const myTeam=(mapD.teams||[]).find(function(t){return t.id===SESS.team_id;})||{};
     let cards=drones.map(dr=>{
       const catTxt = dr.model_category ? ' · '+CATLBL[dr.model_category] : '';
       return `<div class="card">
@@ -533,10 +539,31 @@ async function renderHome(){
     if(!drones.length) cards='<div class="card muted">배정된 기체가 없습니다.</div>';
     v.innerHTML=`<div class="between"><div class="lbl" style="margin:0">내 역할</div>
       <span class="badge" style="background:var(--navy);color:#cfe0f0">${document.getElementById('rb_role').textContent}</span></div>
+      <div class="lbl" style="margin:12px 0 0">팀 상태 (직접 설정)</div>
+      <div id="teamStatusSel" style="display:flex;gap:6px;margin-top:6px"></div>
       <div class="lbl" style="margin:12px 0 0">상황 지도</div>
       <div id="home_map" class="minimap"></div>${cards}`;
+    renderTeamStatusSelector(myTeam.status);
     homeMap();
   }catch(e){ v.innerHTML=err(e); }
+}
+const TEAM_STATUS_OPTS=[
+  {k:'unavailable', label:'운용불가', color:'#E24A3B'},
+  {k:'preparing', label:'준비중', color:'#E1A800'},
+  {k:'ready', label:'준비완료', color:'#2FA35A'},
+  {k:'on_mission', label:'임무중', color:'#3B82D6'},
+];
+function renderTeamStatusSelector(current){
+  const el=document.getElementById('teamStatusSel');
+  if(!el) return;
+  el.innerHTML = TEAM_STATUS_OPTS.map(function(o){
+    const active = o.k===current;
+    return `<button class="status-chip" style="border-color:${o.color};background:${active?o.color:'transparent'};color:${active?'#0c1420':o.color}" onclick="setTeamStatus('${o.k}')">${o.label}</button>`;
+  }).join('');
+}
+async function setTeamStatus(status){
+  try{ await api('/teams/status','POST',{status}); toast('팀 상태 변경됨'); renderHome(); }
+  catch(e){ toast('변경 실패'); }
 }
 
 // ---- 팀관리 (팀원 + 기체 현황 관리) ----
