@@ -200,6 +200,7 @@
   <span class="build">[시범운용]</span>
   <span class="modeb mode-real" id="mode">실제</span>
   <span class="clk mono" id="clk">--:--:--</span>
+  <button id="resetBtn" onclick="openModalEl('modal_reset')" title="전체 데이터 초기화" style="display:none;background:none;border:none;color:#ff8579;font-size:16px;margin-left:10px;padding:0 2px;cursor:pointer;line-height:1">⚠</button>
   <button id="dash_logout" onclick="doLogout()" title="로그아웃"
     style="background:none;border:none;color:var(--muted);font-size:17px;margin-left:10px;padding:0 2px;cursor:pointer;line-height:1">⏻</button>
 </header>
@@ -217,7 +218,12 @@
       <div class="maphd">
         <h2 style="margin:0">공통작전상황도 (COP)</h2>
         <span id="drawhint" style="display:none;margin-left:10px;font-size:11.5px;font-weight:700;color:#F3C070">● 경로 그리기 중 — 지도를 클릭</span>
-        <div style="display:flex;gap:6px;margin-left:auto">
+        <div style="display:flex;gap:6px;margin-left:auto;align-items:center">
+          <select id="mapStyleSel" onchange="setMapStyle(this.value)" style="width:auto;padding:5px 8px;font-size:11.5px">
+            <option value="dark">🌙 다크(야간)</option>
+            <option value="topo">🗺 지형도(군사형)</option>
+            <option value="sat">🛰 위성</option>
+          </select>
           <span class="lyr" onclick="fitAllView()" style="background:var(--steel);color:#fff;border-color:var(--steel)">⤢ 전체보기</span>
           <span class="lyr on" data-layer="teams" onclick="toggleLayer(this)">팀</span>
           <span class="lyr on" data-layer="reports" onclick="toggleLayer(this)">정찰</span>
@@ -286,7 +292,11 @@
       <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
         <div class="between" style="flex:none">
           <h2 style="margin:0">화력지원 요청</h2>
-          <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_fires')">⤢ 펼쳐보기</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="selectAll('fires',true,'')">전체선택</button>
+            <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="bulkDelete('fires','')">선택 삭제</button>
+            <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_fires')">⤢ 펼쳐보기</button>
+          </div>
         </div>
         <div id="fires" style="display:flex;flex-direction:column;gap:7px;overflow-y:auto"></div>
       </div>
@@ -301,21 +311,25 @@
           <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer">
             <input type="checkbox" id="chk_show_cancelled" onchange="loadBoard()" style="width:13px;height:13px"> 취소된 임무 표시
           </label>
+          <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="bulkDelete('missions','')">선택 삭제</button>
           <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_board')">⤢ 펼쳐보기</button>
         </div>
       </div>
       <div class="scrollbody">
-        <table><thead><tr><th>#</th><th>유형</th><th>팀</th><th>좌표</th><th>거리</th><th>상태</th><th>현장 응답</th><th>최근 보고</th><th></th></tr></thead>
+        <table><thead><tr><th><input type="checkbox" onchange="selectAll('missions',this.checked,'')"></th><th>#</th><th>유형</th><th>팀</th><th>좌표</th><th>거리</th><th>상태</th><th>현장 응답</th><th>최근 보고</th><th></th></tr></thead>
           <tbody id="board"></tbody></table>
       </div>
     </div>
     <div class="card">
       <div class="between" style="flex:none">
         <h2 style="margin:0">최근 보고 (전체)</h2>
-        <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_reports')">⤢ 펼쳐보기</button>
+        <div style="display:flex;align-items:center;gap:10px">
+          <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="bulkDelete('reports','')">선택 삭제</button>
+          <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_reports')">⤢ 펼쳐보기</button>
+        </div>
       </div>
       <div class="scrollbody">
-        <table><thead><tr><th>#</th><th>시각</th><th>팀</th><th>종류</th><th>좌표</th><th>모드</th><th>내용</th><th>조치</th></tr></thead>
+        <table><thead><tr><th><input type="checkbox" onchange="selectAll('reports',this.checked,'')"></th><th>#</th><th>시각</th><th>팀</th><th>종류</th><th>좌표</th><th>모드</th><th>내용</th><th>조치</th></tr></thead>
           <tbody id="reports"></tbody></table>
       </div>
     </div>
@@ -324,26 +338,56 @@
 
 <div id="modal_board" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_board')">
   <div class="modal-box">
-    <div class="modal-head"><h2 style="margin:0">임무 지시 현황판 — 전체보기</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_board')">✕ 닫기</button></div>
+    <div class="modal-head"><h2 style="margin:0">임무 지시 현황판 — 전체보기</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="bulkDelete('missions','_modal')">선택 삭제</button>
+        <button class="btn btn-ghost" onclick="closeModalEl('modal_board')">✕ 닫기</button>
+      </div></div>
     <div class="modal-body">
-      <table><thead><tr><th>#</th><th>유형</th><th>팀</th><th>좌표</th><th>거리</th><th>상태</th><th>현장 응답</th><th>최근 보고</th><th></th></tr></thead>
+      <table><thead><tr><th><input type="checkbox" onchange="selectAll('missions',this.checked,'_modal')"></th><th>#</th><th>유형</th><th>팀</th><th>좌표</th><th>거리</th><th>상태</th><th>현장 응답</th><th>최근 보고</th><th></th></tr></thead>
         <tbody id="board_modal"></tbody></table>
     </div>
   </div>
 </div>
 <div id="modal_reports" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_reports')">
   <div class="modal-box">
-    <div class="modal-head"><h2 style="margin:0">최근 보고 — 전체보기</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_reports')">✕ 닫기</button></div>
+    <div class="modal-head"><h2 style="margin:0">최근 보고 — 전체보기</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="bulkDelete('reports','_modal')">선택 삭제</button>
+        <button class="btn btn-ghost" onclick="closeModalEl('modal_reports')">✕ 닫기</button>
+      </div></div>
     <div class="modal-body">
-      <table><thead><tr><th>#</th><th>시각</th><th>팀</th><th>종류</th><th>좌표</th><th>모드</th><th>내용</th><th>조치</th></tr></thead>
+      <table><thead><tr><th><input type="checkbox" onchange="selectAll('reports',this.checked,'_modal')"></th><th>#</th><th>시각</th><th>팀</th><th>종류</th><th>좌표</th><th>모드</th><th>내용</th><th>조치</th></tr></thead>
         <tbody id="reports_modal"></tbody></table>
     </div>
   </div>
 </div>
 <div id="modal_fires" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_fires')">
   <div class="modal-box">
-    <div class="modal-head"><h2 style="margin:0">화력지원 요청 — 전체보기</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_fires')">✕ 닫기</button></div>
+    <div class="modal-head"><h2 style="margin:0">화력지원 요청 — 전체보기</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" onclick="selectAll('fires',true,'_modal')">전체선택</button>
+        <button class="btn btn-ghost" onclick="bulkDelete('fires','_modal')">선택 삭제</button>
+        <button class="btn btn-ghost" onclick="closeModalEl('modal_fires')">✕ 닫기</button>
+      </div></div>
     <div class="modal-body" id="fires_modal" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<div id="modal_reset" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_reset')">
+  <div class="modal-box" style="width:min(480px,92vw)">
+    <div class="modal-head"><h2 style="margin:0;color:#ff8579">⚠ 전체 데이터 초기화</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_reset')">✕ 닫기</button></div>
+    <div class="modal-body">
+      <div class="warn" style="line-height:1.7;margin-bottom:14px">
+        다음 데이터가 <b>모두 영구 삭제</b>됩니다 (되돌릴 수 없음):<br>
+        · 임무 지시 전체 · 결과 보고 전체 · 화력지원 요청 전체<br>
+        · 팀 메시지 전체 · 위치 보고 이력 · 활동 로그<br><br>
+        <b style="color:#6fe0a0">유지되는 정보</b> — 팀·계정·팀원 명단·기체 등록 정보는 삭제되지 않습니다.
+      </div>
+      <div class="lbl">계속하려면 아래에 정확히 <b class="mono">초기화</b> 를 입력하세요</div>
+      <input id="reset_confirm_text" placeholder="초기화" style="margin:8px 0 12px">
+      <button class="btn" style="width:100%;padding:12px;background:linear-gradient(180deg,#E24A3B,#B93A2C);color:#fff;border:none;border-radius:10px;font-weight:800;cursor:pointer" onclick="doFullReset()">전체 데이터 초기화 실행</button>
+    </div>
   </div>
 </div>
 
@@ -424,6 +468,7 @@ async function login(){
     TOKEN=r.token; ROLE=r.role; sessionStorage.setItem('iuccs_dash_token',TOKEN); sessionStorage.setItem('iuccs_dash_role',ROLE);
     document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='flex';
     startClock(); loadAll(); setInterval(loadAll,10000); ensureNotifyPermission();
+    document.getElementById('resetBtn').style.display = ROLE==='admin' ? 'inline' : 'none';
   }catch(e){ document.getElementById('l_err').style.display='block'; }
 }
 function fmtClock(d){
@@ -485,8 +530,10 @@ function boardRowHtml(m, suffix){
   const rowStyle = (m.status==='completed'||m.status==='cancelled') ? ' style="opacity:.6"' : '';
   const canCancel = ROLE==='admin' && m.status!=='completed' && m.status!=='cancelled';
   const cancelBtn = canCancel ? `<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="cancelMission(${m.id})">임무취소</button>` : '';
+  const deleteBtn = ROLE==='admin' ? `<button class="btn btn-ghost" style="padding:3px 8px;font-size:10px" onclick="deleteRow('missions',${m.id})">🗑</button>` : '';
   const issuedTime = esc(String(m.issued_at||'')).slice(5,16);
   return `<tr${rowStyle}>
+    <td><input type="checkbox" class="rowchk-missions${suffix}" value="${m.id}"></td>
     <td class="mono" style="font-size:10.5px;color:var(--muted)">#${m.id}<br>${issuedTime}</td>
     <td><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span></td>
     <td style="font-weight:700;color:${esc(TEAMCOLORS[m.team_id]||'#cfe0f0')}">${esc(teamNo)}팀</td>
@@ -495,7 +542,7 @@ function boardRowHtml(m, suffix){
     <td>${statusCell}</td>
     <td>${respCell}</td>
     <td class="wrap-ok">${lastRepHtml}</td>
-    <td>${cancelBtn}</td></tr>`;
+    <td>${cancelBtn}${deleteBtn}</td></tr>`;
 }
 async function loadBoard(){
   try{
@@ -505,7 +552,7 @@ async function loadBoard(){
     if(!showCancelled){ all = all.filter(function(m){ return m.status!=='cancelled'; }); }
     const build=function(ms,suffix){
       return ms.length ? ms.map(function(m){ return boardRowHtml(m,suffix); }).join('')
-        : '<tr><td colspan="9" class="muted">표시할 임무가 없습니다.</td></tr>';
+        : '<tr><td colspan="10" class="muted">표시할 임무가 없습니다.</td></tr>';
     };
     const bEl=document.getElementById('board'); if(bEl) bEl.innerHTML=build(all.slice(0,20),'');
     const bmEl=document.getElementById('board_modal'); if(bmEl) bmEl.innerHTML=build(all,'_modal');
@@ -520,10 +567,33 @@ function fitAllView(){
   try{ MAP.fitBounds(LAST_PTS,{padding:[30,30],maxZoom:15}); }catch(e){}
 }
 const STATUSCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
+const MAP_STYLES={
+  dark:{label:'다크(야간)', url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', sub:'abcd',
+    attr:'&copy; OpenStreetMap &copy; CARTO'},
+  topo:{label:'지형도(군사형)', url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', sub:'abc',
+    attr:'&copy; OpenStreetMap contributors, SRTM | &copy; OpenTopoMap (CC-BY-SA)'},
+  sat:{label:'위성', url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', sub:'',
+    attr:'Esri, Maxar, Earthstar Geographics'},
+};
+let BASE_LAYER=null, CURRENT_MAP_STYLE='dark';
+function setMapStyle(styleKey){
+  const st=MAP_STYLES[styleKey]; if(!st||!MAP) return;
+  if(BASE_LAYER){ MAP.removeLayer(BASE_LAYER); }
+  const opts={maxZoom:19,attribution:st.attr};
+  if(st.sub) opts.subdomains=st.sub;
+  BASE_LAYER=L.tileLayer(st.url,opts).addTo(MAP);
+  BASE_LAYER.bringToBack();
+  CURRENT_MAP_STYLE=styleKey;
+  const sel=document.getElementById('mapStyleSel'); if(sel) sel.value=styleKey;
+  try{ localStorage.setItem('iuccs_map_style', styleKey); }catch(e){}
+}
 function initMap(){
   if(MAP||typeof L==='undefined') return;
   MAP=L.map('map',{zoomControl:true}).setView([37.555,127.01],13);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(MAP);
+  let savedStyle='dark';
+  try{ savedStyle=localStorage.getItem('iuccs_map_style')||'dark'; }catch(e){}
+  if(!MAP_STYLES[savedStyle]) savedStyle='dark';
+  setMapStyle(savedStyle);
   LG.teams=L.layerGroup().addTo(MAP); LG.reports=L.layerGroup().addTo(MAP); LG.fires=L.layerGroup().addTo(MAP);
   LG.route=L.layerGroup().addTo(MAP); LG.missionRoutes=L.layerGroup().addTo(MAP);
   MLINE=L.polyline([],{color:'#E8A33D',weight:3,dashArray:'6,7'}).addTo(LG.route);
@@ -875,8 +945,14 @@ function droneCardD(dr){
     <div style="display:flex;gap:7px">
       <input id="tdr_note_${dr.id}" value="${esc(dr.note||'')}" placeholder="비고 (특이사항)" style="flex:1">
       <button class="btn btn-amber" style="padding:0 14px;flex:none" onclick="saveDroneD(${dr.id})">저장</button>
+      <button class="btn btn-ghost" style="padding:0 12px;flex:none" onclick="deleteDroneD(${dr.id})">삭제</button>
     </div>
   </div>`;
+}
+async function deleteDroneD(id){
+  if(!confirm('이 기체를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+  try{ await api('/drones/delete','POST',{id}); toast('기체 삭제됨'); loadTeamDrawer(TD_TEAM_ID); loadDash(); }
+  catch(e){ toast('삭제 실패'); }
 }
 async function saveDroneD(id){
   const g=k=>document.getElementById(k+'_'+id).value;
@@ -936,8 +1012,12 @@ function fireCardHtml(f, suffix){
         <button class="btn btn-amber" style="flex:1" onclick="submitDecide(${f.id},'${suffix}')">결정 저장</button>
       </div>
     </div>` : '';
+  const delBtn = ROLE==='admin' ? `<button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="deleteRow('fires',${f.id})">🗑</button>` : '';
   return `<div style="border:1px solid var(--line);border-radius:9px;padding:8px 10px">
-    <div class="mono muted" style="font-size:10px;margin-bottom:3px">#${f.id} · 접수 ${createdTime}</div>
+    <div class="between" style="margin-bottom:3px">
+      <label style="display:flex;align-items:center;gap:6px"><input type="checkbox" value="${f.id}"><span class="mono muted" style="font-size:10px">#${f.id} · 접수 ${createdTime}</span></label>
+      ${delBtn}
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center">
       <span style="font-size:12px"><span style="color:${teamColorForNo(TEAMNO[f.team_id]||'')};font-weight:700">${esc(TEAMNO[f.team_id]||f.team_id)}팀</span> · ${esc(f.target||'표적')} · <span class="mono">${esc(coordText(f.lat,f.lng,f.coord))}</span></span>
       <span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${FSTAT[f.status]||f.status}${decidedInfo}</span></div>
@@ -1013,14 +1093,16 @@ async function loadReports(){
       } else {
         actionCell=`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`;
       }
-      return `<tr><td class="mono muted" data-label="#" style="font-size:10.5px">#${r.id}</td>
+      const delBtn = ROLE==='admin' ? ` <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="deleteRow('reports',${r.id})">🗑</button>` : '';
+      return `<tr><td><input type="checkbox" value="${r.id}"></td>
+        <td class="mono muted" data-label="#" style="font-size:10.5px">#${r.id}</td>
         <td class="muted mono" data-label="시각" style="font-size:11px">${esc(String(r.created_at)).slice(5,16)}</td>
         <td data-label="팀" style="color:${teamColorForNo(teamNo)};font-weight:700">${esc(teamNo)}팀</td><td data-label="종류">${r.kind==='recon'?'정찰':(r.kind==='attack'?'공격':'사진')}</td>
         <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordStr)}</td>
         <td data-label="모드"><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
         <td data-label="내용" style="font-size:12px">${esc(c)}</td>
-        <td data-label="조치">${actionCell}</td></tr>`;}).join('')
-      :'<tr><td colspan="8" class="muted">보고 없음</td></tr>';
+        <td data-label="조치">${actionCell}${delBtn}</td></tr>`;}).join('')
+      :'<tr><td colspan="9" class="muted">보고 없음</td></tr>';
     const rEl=document.getElementById('reports'); if(rEl) rEl.innerHTML=html;
     const rmEl=document.getElementById('reports_modal'); if(rmEl) rmEl.innerHTML=html;
   }catch(e){}
@@ -1060,6 +1142,72 @@ async function reportAction(id, action, lat, lng, coord, targetInfo){
 async function ackReport(id){ try{ await api('/reports/ack','POST',{id}); loadReports(); loadDash(); loadBoard(); }catch(e){alert('실패');} }
 function toast(msg){ const t=document.getElementById('toast'); if(!t) return; t.textContent=msg; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},2200); }
 function openModalEl(id){ const el=document.getElementById(id); if(el) el.style.display='flex'; }
+
+// ---- delete / bulk-delete ----
+function containerIdFor(type,suffix){
+  const base = type==='missions' ? 'board' : (type==='fires' ? 'fires' : 'reports');
+  return base+suffix;
+}
+function endpointFor(type){
+  return type==='missions' ? '/missions' : (type==='fires' ? '/fire-requests' : '/reports');
+}
+function selectAll(type,checked,suffix){
+  const el=document.getElementById(containerIdFor(type,suffix));
+  if(!el) return;
+  el.querySelectorAll('input[type=checkbox]').forEach(function(cb){ cb.checked=checked; });
+}
+function getSelectedIds(type,suffix){
+  const el=document.getElementById(containerIdFor(type,suffix));
+  if(!el) return [];
+  return Array.from(el.querySelectorAll('input[type=checkbox]:checked')).map(function(cb){ return +cb.value; });
+}
+function refreshAfter(type){
+  if(type==='missions'){ loadBoard(); loadDash(); loadMap(); }
+  else if(type==='fires'){ loadFires(); loadDash(); }
+  else { loadReports(); loadDash(); loadBoard(); }
+}
+async function doFullReset(){
+  const v=document.getElementById('reset_confirm_text').value.trim();
+  if(v!=='초기화'){ toast('확인 문구가 일치하지 않습니다.'); return; }
+  if(!confirm('정말로 전체 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+  try{
+    await api('/admin/reset','POST',{confirm:'RESET'});
+    toast('전체 데이터가 초기화되었습니다.');
+    closeModalEl('modal_reset');
+    document.getElementById('reset_confirm_text').value='';
+    loadAll();
+  }catch(e){ toast('초기화 실패 (관리자 권한 필요)'); }
+}
+async function bulkDelete(type,suffix){
+  const ids=getSelectedIds(type,suffix);
+  if(!ids.length){ toast('선택된 항목이 없습니다.'); return; }
+  if(!confirm(`선택한 ${ids.length}건을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.`)) return;
+  try{
+    await api(endpointFor(type)+'/bulk-delete','POST',{ids});
+    toast(ids.length+'건 삭제됨');
+    refreshAfter(type);
+  }catch(e){ toast('삭제 실패 (관리자 권한 필요)'); }
+}
+async function deleteRow(type,id){
+  if(!confirm('이 항목을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.')) return;
+  try{
+    await api(endpointFor(type)+'/delete','POST',{id});
+    toast('삭제됨');
+    refreshAfter(type);
+  }catch(e){ toast('삭제 실패 (관리자 권한 필요)'); }
+}
+async function doFullReset(){
+  const v=document.getElementById('reset_confirm_text').value.trim();
+  if(v!=='초기화'){ toast('확인 문구가 일치하지 않습니다.'); return; }
+  if(!confirm('정말로 전체 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+  try{
+    await api('/admin/reset','POST',{confirm:'RESET'});
+    toast('초기화 완료');
+    closeModalEl('modal_reset');
+    document.getElementById('reset_confirm_text').value='';
+    loadAll();
+  }catch(e){ toast('초기화 실패'); }
+}
 
 // ---- messaging ----
 let MSG_TEAM_ID=null;
@@ -1176,9 +1324,9 @@ if(TOKEN){
   document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='flex';
   startClock(); setInterval(loadAll,10000); ensureNotifyPermission();
   if(!ROLE){
-    api('/session').then(function(s){ ROLE=s.role; sessionStorage.setItem('iuccs_dash_role',ROLE); loadAll(); })
+    api('/session').then(function(s){ ROLE=s.role; sessionStorage.setItem('iuccs_dash_role',ROLE); document.getElementById('resetBtn').style.display=ROLE==='admin'?'inline':'none'; loadAll(); })
       .catch(function(){ loadAll(); });
-  } else { loadAll(); }
+  } else { document.getElementById('resetBtn').style.display=ROLE==='admin'?'inline':'none'; loadAll(); }
 }
 </script>
 </body>

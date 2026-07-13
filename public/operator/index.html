@@ -612,8 +612,16 @@ function droneCard(dr){
     </select>
     <div class="lbl">비고 (특이사항)</div>
     <input id="dr_note_${dr.id}" value="${esc(dr.note||'')}" placeholder="예: 프로펠러 교체 필요" style="margin-bottom:10px">
-    <button class="btn btn-amber" style="padding:10px" onclick="saveDrone(${dr.id})">저장</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-amber" style="padding:10px;flex:1" onclick="saveDrone(${dr.id})">저장</button>
+      <button class="btn btn-ghost" style="padding:10px;flex:none" onclick="deleteDrone(${dr.id})">삭제</button>
+    </div>
   </div>`;
+}
+async function deleteDrone(id){
+  if(!confirm('이 기체를 삭제하시겠습니까? 되돌릴 수 없습니다.')) return;
+  try{ await api('/drones/delete','POST',{id}); toast('기체 삭제됨'); renderDrones(); }
+  catch(e){ toast('삭제 실패'); }
 }
 async function saveDrone(id){
   const g=k=>document.getElementById(k+'_'+id).value;

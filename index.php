@@ -242,7 +242,20 @@ function route($path, $method)
         }
         json_out(array('id' => $pdo->lastInsertId()), 201);
     }
-
+    if ($path === '/api/drones/delete' && $method === 'POST') {
+        $s  = Auth::require_auth();
+        $b  = body_json();
+        $id = pval($b, 'id');
+        if ($s['role'] !== 'admin') {
+            $chk = $pdo->prepare("SELECT team_id FROM iuccs_drones WHERE id = ?");
+            $chk->execute(array($id));
+            $d = $chk->fetch();
+            if (!$d || $d['team_id'] != $s['team_id']) { json_out(array('error' => 'forbidden'), 403); }
+        }
+        $pdo->prepare("DELETE FROM iuccs_drones WHERE id = ?")->execute(array($id));
+        log_activity('team#' . pval($s, 'team_id', '?'), 'drone_delete', 'drone', $id, null);
+        json_out(array('ok' => true));
+    }
     if ($path === '/api/team-members') {
         Auth::require_auth();
         $tid = pval($_GET, 'team_id');
@@ -446,6 +459,26 @@ function route($path, $method)
         log_activity('user#' . $s['user_id'], 'mission_cancel', 'mission', $id, null);
         json_out(array('ok' => true));
     }
+    if ($path === '/api/missions/delete' && $method === 'POST') {
+        $s  = Auth::require_auth(array('admin'));
+        $b  = body_json();
+        $id = pval($b, 'id');
+        $pdo->prepare("DELETE FROM iuccs_missions WHERE id = ?")->execute(array($id));
+        log_activity('user#' . $s['user_id'], 'mission_delete', 'mission', $id, null);
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/missions/bulk-delete' && $method === 'POST') {
+        $s   = Auth::require_auth(array('admin'));
+        $b   = body_json();
+        $ids = pval($b, 'ids');
+        if (!is_array($ids) || !count($ids)) { json_out(array('error' => 'ids_required'), 400); }
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if (!count($ids)) { json_out(array('error' => 'ids_required'), 400); }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $pdo->prepare("DELETE FROM iuccs_missions WHERE id IN ($ph)")->execute($ids);
+        log_activity('user#' . $s['user_id'], 'mission_bulk_delete', 'mission', null, implode(',', $ids));
+        json_out(array('ok' => true, 'count' => count($ids)));
+    }
     if ($path === '/api/missions/approve' && $method === 'POST') {
         $s = Auth::require_auth(array('admin'));
         $b = body_json();
@@ -512,6 +545,26 @@ function route($path, $method)
         log_activity('user#' . $s['user_id'], 'report_action', 'report', $id, $action);
         json_out(array('ok' => true));
     }
+    if ($path === '/api/reports/delete' && $method === 'POST') {
+        $s  = Auth::require_auth(array('admin'));
+        $b  = body_json();
+        $id = pval($b, 'id');
+        $pdo->prepare("DELETE FROM iuccs_reports WHERE id = ?")->execute(array($id));
+        log_activity('user#' . $s['user_id'], 'report_delete', 'report', $id, null);
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/reports/bulk-delete' && $method === 'POST') {
+        $s   = Auth::require_auth(array('admin'));
+        $b   = body_json();
+        $ids = pval($b, 'ids');
+        if (!is_array($ids) || !count($ids)) { json_out(array('error' => 'ids_required'), 400); }
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if (!count($ids)) { json_out(array('error' => 'ids_required'), 400); }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $pdo->prepare("DELETE FROM iuccs_reports WHERE id IN ($ph)")->execute($ids);
+        log_activity('user#' . $s['user_id'], 'report_bulk_delete', 'report', null, implode(',', $ids));
+        json_out(array('ok' => true, 'count' => count($ids)));
+    }
 
     if ($path === '/api/fire-requests' && $method === 'GET') {
         Auth::require_auth();
@@ -544,6 +597,45 @@ function route($path, $method)
         $pdo->prepare("UPDATE iuccs_fire_requests SET status = ?, fire_time = ? WHERE id = ?")
             ->execute(array($stt, $ft, pval($b, 'id', 0)));
         log_activity('user#' . $s['user_id'], 'fire_status', 'fire_request', pval($b, 'id', 0), $stt);
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/fire-requests/delete' && $method === 'POST') {
+        $s  = Auth::require_auth(array('admin'));
+        $b  = body_json();
+        $id = pval($b, 'id');
+        $pdo->prepare("DELETE FROM iuccs_fire_requests WHERE id = ?")->execute(array($id));
+        log_activity('user#' . $s['user_id'], 'fire_delete', 'fire_request', $id, null);
+        json_out(array('ok' => true));
+    }
+    if ($path === '/api/fire-requests/bulk-delete' && $method === 'POST') {
+        $s   = Auth::require_auth(array('admin'));
+        $b   = body_json();
+        $ids = pval($b, 'ids');
+        if (!is_array($ids) || !count($ids)) { json_out(array('error' => 'ids_required'), 400); }
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if (!count($ids)) { json_out(array('error' => 'ids_required'), 400); }
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $pdo->prepare("DELETE FROM iuccs_fire_requests WHERE id IN ($ph)")->execute($ids);
+        log_activity('user#' . $s['user_id'], 'fire_bulk_delete', 'fire_request', null, implode(',', $ids));
+        json_out(array('ok' => true, 'count' => count($ids)));
+    }
+
+    if ($path === '/api/admin/reset' && $method === 'POST') {
+        $s = Auth::require_auth(array('admin'));
+        $b = body_json();
+        if (pval($b, 'confirm') !== 'RESET') {
+            json_out(array('error' => 'confirm_required'), 400);
+        }
+        // Wipes operational/transactional data only. Teams, accounts, roster,
+        // drones and drone models are preserved so the system stays usable.
+        $tables = array(
+            'iuccs_missions', 'iuccs_reports', 'iuccs_fire_requests',
+            'iuccs_messages', 'iuccs_team_tracks', 'iuccs_activity_log',
+        );
+        foreach ($tables as $t) {
+            $pdo->exec("TRUNCATE TABLE $t");
+        }
+        log_activity('user#' . $s['user_id'], 'admin_reset', null, null, 'full operational data reset');
         json_out(array('ok' => true));
     }
 
