@@ -66,8 +66,13 @@
     font-size:12px;line-height:1.4;padding:9px 11px;border-radius:9px}
 </style>
 <style>
-  .pickmap{height:200px;border-radius:11px;border:1px solid var(--line);margin-top:8px;background:#0b1626;z-index:1}
-  .minimap{height:180px;border-radius:12px;border:1px solid var(--line);margin:4px 0 2px;background:#0b1626;z-index:1}
+  .pickmap{height:200px;border-radius:11px;border:1px solid var(--line);margin-top:8px;background:#0b1626;z-index:1;position:relative}
+  .minimap{height:180px;border-radius:12px;border:1px solid var(--line);margin:4px 0 2px;background:#0b1626;z-index:1;position:relative}
+  .locate-btn{position:absolute;top:10px;right:10px;z-index:401;background:#16273f;border:1px solid #2e5a88;color:#E8A33D;
+    width:34px;height:34px;border-radius:9px;font-size:16px;display:flex;align-items:center;justify-content:center;
+    cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.45);padding:0}
+  .locate-btn:active{background:#1c3252}
+  .locate-btn[disabled]{opacity:.5}
   .geo{font-size:12px;color:var(--muted);margin-top:8px}
   .geo b{color:var(--ink);font-family:"SF Mono",monospace}
   .rcoords{font-size:12px;color:var(--text);margin-top:7px;line-height:1.6}
@@ -390,6 +395,25 @@ function doLogout(){
 const TILE='https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 const TCOL={unavailable:'#E24A3B',preparing:'#E1A800',ready:'#2FA35A',on_mission:'#3B82D6'};
 function darkTiles(map){L.tileLayer(TILE,{maxZoom:19,subdomains:'abcd',attribution:'&copy; OSM &copy; CARTO'}).addTo(map);}
+function addLocateBtn(map, containerId, onFound){
+  const container=document.getElementById(containerId);
+  if(!container||typeof L==='undefined') return;
+  const btn=document.createElement('button');
+  btn.type='button'; btn.className='locate-btn'; btn.title='현재 위치로 이동'; btn.innerHTML='📍';
+  L.DomEvent.disableClickPropagation(btn);
+  btn.onclick=function(){
+    if(!navigator.geolocation){ toast('위치 정보를 사용할 수 없습니다'); return; }
+    btn.disabled=true;
+    navigator.geolocation.getCurrentPosition(function(pos){
+      const la=pos.coords.latitude, ln=pos.coords.longitude;
+      map.setView([la,ln], Math.max(map.getZoom(),15));
+      if(onFound) onFound(la,ln);
+      btn.disabled=false;
+    }, function(){ toast('위치 권한이 거부되었거나 가져올 수 없습니다'); btn.disabled=false; },
+    {enableHighAccuracy:true, maximumAge:30000, timeout:10000});
+  };
+  container.appendChild(btn);
+}
 function mountPicker(elId,onSet){
   if(typeof L==='undefined')return null;
   const map=L.map(elId,{zoomControl:true}).setView([37.555,127.01],13);
@@ -404,6 +428,7 @@ function mountPicker(elId,onSet){
     onSet(la,ln);
   });
   setTimeout(function(){map.invalidateSize();},250);
+  addLocateBtn(map, elId, function(la,ln){ place(la,ln); onSet(la,ln); });
   return {map:map, place:place};
 }
 function diamondIcon(blink){ return L.divIcon({className:'diamond-icon',html:'<div class="diamond'+(blink?' blinking':'')+'"></div>',iconSize:[20,20],iconAnchor:[10,10]}); }
@@ -412,6 +437,7 @@ async function homeMap(){
   if(typeof L==='undefined'||!document.getElementById('home_map'))return;
   const map=L.map('home_map',{zoomControl:false,attributionControl:false}).setView([37.555,127.01],12);
   darkTiles(map);
+  addLocateBtn(map,'home_map');
   try{
     const d=await api('/map'); const pts=[];
     const teamNoOf={}; (d.teams||[]).forEach(function(t){ teamNoOf[t.id]=t.team_no; });
@@ -761,6 +787,7 @@ function mountRouteMap(elId,pts){
   });
   try{ map.fitBounds(pts,{padding:[24,24],maxZoom:15}); }catch(e){}
   setTimeout(function(){map.invalidateSize();},250);
+  addLocateBtn(map, elId);
 }
 
 
