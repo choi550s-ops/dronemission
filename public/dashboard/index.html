@@ -878,9 +878,12 @@ async function loadTeamDrawer(id){
     const s=STATUS[team.status]||[team.status,'var(--muted)'];
     document.getElementById('td_title').innerHTML = `<span style="color:${teamColorForNo(team.team_no)}">${esc(team.team_no)}팀</span> 상세관리`;
     body.innerHTML = `
-      <div class="between" style="margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:10px">
-        <span style="font-size:12.5px"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</span>
-        <span class="mono muted" style="font-size:11px">${esc(coordText(team.lat,team.lng,team.coord))}</span>
+      <div style="margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:10px">
+        <div class="between" style="margin-bottom:8px">
+          <span style="font-size:12.5px"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</span>
+          <span class="mono muted" style="font-size:11px">${esc(coordText(team.lat,team.lng,team.coord))}</span>
+        </div>
+        <div id="td_status_sel" style="display:flex;gap:6px"></div>
       </div>
       <div class="td-grid">
         <div class="td-col">
@@ -910,7 +913,27 @@ async function loadTeamDrawer(id){
       </div>`;
     renderMemberListD(members, id);
     document.getElementById('td_drones').innerHTML = drones.length ? drones.map(function(dr){ return droneCardD(dr); }).join('') : '<div class="muted" style="font-size:12px">등록된 기체가 없습니다.</div>';
+    renderTeamStatusSelD(id, team.status);
   }catch(e){ body.innerHTML='<div class="muted" style="font-size:12px">불러오기 실패</div>'; }
+}
+const TEAM_STATUS_OPTS_D=[
+  {k:'unavailable', label:'운용불가', color:'#E24A3B'},
+  {k:'preparing', label:'준비중', color:'#E1A800'},
+  {k:'ready', label:'준비완료', color:'#2FA35A'},
+  {k:'on_mission', label:'임무중', color:'#3B82D6'},
+];
+function renderTeamStatusSelD(teamId, current){
+  const el=document.getElementById('td_status_sel');
+  if(!el) return;
+  el.innerHTML = TEAM_STATUS_OPTS_D.map(function(o){
+    const active = o.k===current;
+    return `<button style="flex:1;border:1.5px solid ${o.color};background:${active?o.color:'transparent'};color:${active?'#0c1420':o.color};
+      font-weight:800;font-size:10.5px;padding:7px 2px;border-radius:7px;cursor:pointer;font-family:inherit" onclick="setTeamStatusD(${teamId},'${o.k}')">${o.label}</button>`;
+  }).join('');
+}
+async function setTeamStatusD(teamId, status){
+  try{ await api('/teams/status','POST',{team_id:teamId, status}); toast('팀 상태 변경됨'); loadTeamDrawer(teamId); loadDash(); loadMap(); }
+  catch(e){ toast('변경 실패'); }
 }
 function renderMemberListD(members, tid){
   const el=document.getElementById('td_members'); if(!el) return;
