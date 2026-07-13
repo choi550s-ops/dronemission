@@ -209,7 +209,10 @@
   <div class="opgrid">
     <div class="col colLeft card">
       <div class="ministats" id="counts"></div>
-      <h2>팀 · 자산 현황</h2>
+      <div class="between" style="margin-bottom:2px">
+        <h2 style="margin:0">팀 · 자산 현황</h2>
+        <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_team_add')">+ 팀 추가</button>
+      </div>
       <table><thead><tr><th>팀</th><th>상태</th><th>기체</th></tr></thead>
         <tbody id="teams"></tbody></table>
     </div>
@@ -235,7 +238,10 @@
       <div id="teamPanel" class="team-inmap-panel" style="display:none">
         <div class="team-inmap-head">
           <h2 id="td_title" style="margin:0">팀 상세</h2>
-          <button class="btn btn-ghost" onclick="closeTeamDrawer()">← 지도로 돌아가기</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost" style="color:#ff8579" onclick="deleteTeam()">🗑 팀 삭제</button>
+            <button class="btn btn-ghost" onclick="closeTeamDrawer()">← 지도로 돌아가기</button>
+          </div>
         </div>
         <div class="team-inmap-body" id="td_body"></div>
       </div>
@@ -371,6 +377,23 @@
         <button class="btn btn-ghost" onclick="closeModalEl('modal_fires')">✕ 닫기</button>
       </div></div>
     <div class="modal-body" id="fires_modal" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+</div>
+
+<div id="modal_team_add" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_team_add')">
+  <div class="modal-box" style="width:min(420px,92vw)">
+    <div class="modal-head"><h2 style="margin:0">+ 팀 추가</h2><button class="btn btn-ghost" onclick="closeModalEl('modal_team_add')">✕ 닫기</button></div>
+    <div class="modal-body">
+      <div class="lbl">팀 번호</div>
+      <input id="nt_no" placeholder="예: 07" style="margin-bottom:10px">
+      <div class="lbl">팀 이름 (선택, 비우면 "N팀")</div>
+      <input id="nt_name" placeholder="예: 7팀 정찰조" style="margin-bottom:10px">
+      <div class="lbl">로그인 아이디</div>
+      <input id="nt_login" placeholder="예: 07" style="margin-bottom:10px">
+      <div class="lbl">비밀번호 (4자 이상)</div>
+      <input id="nt_pw" type="password" placeholder="비밀번호" style="margin-bottom:14px">
+      <button class="btn btn-amber" style="width:100%;padding:11px" onclick="createTeam()">팀 추가</button>
+    </div>
   </div>
 </div>
 
@@ -642,7 +665,7 @@ async function loadMap(){
     const ACTLBL={attack:'공격 지시됨',hold:'보류중',friendly:'아군 확인',ack:'확인됨'};
     (d.reports||[]).forEach(function(r){
       const teamNo=TEAMNO[r.team_id]||r.team_id;
-      const targetInfo = r.kind==='recon' ? `병력 ${r.troops||0} · 트럭 ${r.trucks||0} · 차량 ${r.vehicles||0}` : (r.note||'');
+      const targetInfo = r.kind==='recon' ? `병력 ${r.troops||0} · 트럭 ${r.trucks||0} · 차량 ${r.vehicles||0} · 전차 ${r.tanks||0} · 장갑차 ${r.armored||0} · 포병 ${r.artillery||0}` : (r.note||'');
       const at=r.action_taken||'none';
       let m, tipHtml;
       if(r.hostile==1 && at==='friendly'){
@@ -1081,7 +1104,7 @@ async function loadReports(){
       SEEN_MAX_REPORT=Math.max(SEEN_MAX_REPORT,maxId);
     }
     const html = rs.length?rs.map(r=>{
-      let c=r.kind==='recon'?`병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}${r.hostile==1?' · 🔺적식별':''}`
+      let c=r.kind==='recon'?`병력 ${r.troops??0}·트럭 ${r.trucks??0}·차량 ${r.vehicles??0}·전차 ${r.tanks??0}·장갑차 ${r.armored??0}·포병 ${r.artillery??0}${r.hostile==1?' · 🔺적식별':''}`
         :`무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}`;
       const teamNo=TEAMNO[r.team_id]||r.team_id;
       const coordStr=coordText(r.lat,r.lng,r.coord);
@@ -1112,7 +1135,7 @@ function hostileActionCell(r, coordStr){
   const locked = at!=='none';
   const coordArg=String(coordStr||'').replace(/'/g,"\\'");
   const latArg = r.lat==null?'null':+r.lat, lngArg = r.lng==null?'null':+r.lng;
-  const targetDesc=`병력${r.troops??0}·트럭${r.trucks??0}·차량${r.vehicles??0}`;
+  const targetDesc=`병력${r.troops??0}·트럭${r.trucks??0}·차량${r.vehicles??0}·전차${r.tanks??0}·장갑차${r.armored??0}·포병${r.artillery??0}`;
   const targetArg=targetDesc.replace(/'/g,"\\'");
   const defs=[
     {k:'attack', label:'공격'},
@@ -1172,11 +1195,11 @@ async function doFullReset(){
   if(!confirm('정말로 전체 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
   try{
     await api('/admin/reset','POST',{confirm:'RESET'});
-    toast('전체 데이터가 초기화되었습니다.');
+    toast('초기화 완료');
     closeModalEl('modal_reset');
     document.getElementById('reset_confirm_text').value='';
     loadAll();
-  }catch(e){ toast('초기화 실패 (관리자 권한 필요)'); }
+  }catch(e){ toast('초기화 실패'); }
 }
 async function bulkDelete(type,suffix){
   const ids=getSelectedIds(type,suffix);
@@ -1196,17 +1219,35 @@ async function deleteRow(type,id){
     refreshAfter(type);
   }catch(e){ toast('삭제 실패 (관리자 권한 필요)'); }
 }
-async function doFullReset(){
-  const v=document.getElementById('reset_confirm_text').value.trim();
-  if(v!=='초기화'){ toast('확인 문구가 일치하지 않습니다.'); return; }
-  if(!confirm('정말로 전체 데이터를 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+
+// ---- team add/delete ----
+async function createTeam(){
+  const team_no=document.getElementById('nt_no').value.trim();
+  const name=document.getElementById('nt_name').value.trim();
+  const login_id=document.getElementById('nt_login').value.trim();
+  const password=document.getElementById('nt_pw').value;
+  if(!team_no||!login_id||!password){ toast('팀 번호, 로그인 아이디, 비밀번호를 입력하세요.'); return; }
+  if(password.length<4){ toast('비밀번호는 4자 이상이어야 합니다.'); return; }
   try{
-    await api('/admin/reset','POST',{confirm:'RESET'});
-    toast('초기화 완료');
-    closeModalEl('modal_reset');
-    document.getElementById('reset_confirm_text').value='';
-    loadAll();
-  }catch(e){ toast('초기화 실패'); }
+    await api('/teams/create','POST',{team_no,name,login_id,password});
+    toast(team_no+'팀 추가됨');
+    closeModalEl('modal_team_add');
+    ['nt_no','nt_name','nt_login','nt_pw'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('m_team').dataset.filled='';
+    loadDash(); loadMap();
+  }catch(e){ toast(e.error==='password_too_short'?'비밀번호는 4자 이상이어야 합니다.':'추가 실패 (팀 번호 또는 아이디 중복 가능)'); }
+}
+async function deleteTeam(){
+  if(TD_TEAM_ID==null) return;
+  const teamNo=TEAMNO[TD_TEAM_ID]||TD_TEAM_ID;
+  if(!confirm(`${teamNo}팀을 삭제하시겠습니까?\n로그인 계정, 팀원, 기체, 임무·보고·화력요청 기록이 모두 함께 삭제되며 복구할 수 없습니다.`)) return;
+  try{
+    await api('/teams/delete','POST',{id:TD_TEAM_ID});
+    toast(teamNo+'팀 삭제됨');
+    closeTeamDrawer();
+    document.getElementById('m_team').dataset.filled='';
+    loadDash(); loadMap(); loadBoard(); loadReports(); loadFires();
+  }catch(e){ toast('삭제 실패'); }
 }
 
 // ---- messaging ----

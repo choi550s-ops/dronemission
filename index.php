@@ -147,7 +147,7 @@ function route($path, $method)
                FROM iuccs_teams WHERE lat IS NOT NULL ORDER BY team_no"
         )->fetchAll();
         $reports = $pdo->query(
-            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, hostile, action_taken, note, created_at
+            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery, hostile, action_taken, note, created_at
                FROM iuccs_reports WHERE lat IS NOT NULL ORDER BY created_at DESC LIMIT 50"
         )->fetchAll();
         $fires = $pdo->query(
@@ -312,6 +312,52 @@ function route($path, $method)
         json_out(array('ok' => true));
     }
 
+    if ($path === '/api/teams/create' && $method === 'POST') {
+        $s        = Auth::require_auth(array('admin'));
+        $b        = body_json();
+        $teamNo   = trim(pval($b, 'team_no', ''));
+        $name     = trim(pval($b, 'name', ''));
+        $loginId  = trim(pval($b, 'login_id', ''));
+        $password = pval($b, 'password', '');
+        if ($teamNo === '' || $loginId === '' || $password === '') {
+            json_out(array('error' => 'fields_required'), 400);
+        }
+        if (strlen($password) < 4) {
+            json_out(array('error' => 'password_too_short'), 400);
+        }
+        $displayName = $name !== '' ? $name : ($teamNo . '팀');
+        try {
+            $pdo->beginTransaction();
+            $st = $pdo->prepare("INSERT INTO iuccs_teams(team_no, name, status) VALUES (?,?,'ready')");
+            $st->execute(array($teamNo, $displayName));
+            $teamId = $pdo->lastInsertId();
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+            $st2 = $pdo->prepare(
+                "INSERT INTO iuccs_users(team_id, login_id, password_hash, role, display_name) VALUES (?,?,?,'operator',?)"
+            );
+            $st2->execute(array($teamId, $loginId, $hash, $displayName));
+            $pdo->commit();
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            json_out(array('error' => 'duplicate_or_invalid'), 400);
+        }
+        log_activity('user#' . $s['user_id'], 'team_create', 'team', $teamId, $teamNo);
+        json_out(array('id' => $teamId, 'team_no' => $teamNo), 201);
+    }
+    if ($path === '/api/teams/delete' && $method === 'POST') {
+        $s  = Auth::require_auth(array('admin'));
+        $b  = body_json();
+        $id = pval($b, 'id');
+        if (!$id) { json_out(array('error' => 'id_required'), 400); }
+        // Explicitly remove login accounts and drones (their FK is ON DELETE SET NULL,
+        // not CASCADE) so a deleted team doesn't leave orphaned accounts/equipment behind.
+        $pdo->prepare("DELETE FROM iuccs_users WHERE team_id = ?")->execute(array($id));
+        $pdo->prepare("DELETE FROM iuccs_drones WHERE team_id = ?")->execute(array($id));
+        $pdo->prepare("DELETE FROM iuccs_teams WHERE id = ?")->execute(array($id));
+        log_activity('user#' . $s['user_id'], 'team_delete', 'team', $id, null);
+        json_out(array('ok' => true));
+    }
+
     if ($path === '/api/team-track' && $method === 'POST') {
         $s   = Auth::require_auth();
         $b   = body_json();
@@ -357,7 +403,7 @@ function route($path, $method)
         Auth::require_auth();
         $missions = $pdo->query("SELECT * FROM iuccs_missions ORDER BY issued_at DESC LIMIT 100")->fetchAll();
         $reps = $pdo->query(
-            "SELECT id, mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles,
+            "SELECT id, mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery,
                     armed, unarmed, kia, serious, minor, failed, hostile, acknowledged, created_at
                FROM iuccs_reports WHERE mission_id IS NOT NULL ORDER BY created_at DESC"
         )->fetchAll();
@@ -503,15 +549,16 @@ function route($path, $method)
         $kind = in_array(pval($b, 'kind', ''), array('recon', 'attack', 'photo'), true) ? $b['kind'] : 'recon';
         $st  = $pdo->prepare(
             "INSERT INTO iuccs_reports
-                (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles,
+                (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery,
                  armed, unarmed, scale, kia, serious, minor, failed, note, hostile)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'mission_id'), pval($b, 'team_id', $s['team_id']), $kind,
             (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real', pval($b, 'coord'),
             pval($b, 'lat'), pval($b, 'lng'),
             pval($b, 'troops'), pval($b, 'trucks'), pval($b, 'vehicles'),
+            pval($b, 'tanks'), pval($b, 'armored'), pval($b, 'artillery'),
             pval($b, 'armed'), pval($b, 'unarmed'), pval($b, 'scale'),
             pval($b, 'kia'), pval($b, 'serious'), pval($b, 'minor'),
             pval($b, 'failed') ? 1 : 0, pval($b, 'note'), pval($b, 'hostile') ? 1 : 0,

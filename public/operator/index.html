@@ -2,13 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>IUCCS · 조종자 앱</title>
 <style>
   :root{--bg:#0A111E;--surface:#152439;--surface2:#0b1626;--line:#24384F;--navy:#1F3A5F;
     --steel:#2E5A88;--ink:#EAF2FC;--text:#C4D4E7;--muted:#7C90A8;--amber:#E8A33D;--amberD:#C9871B;
     --red:#E24A3B;--yellow:#E1A800;--green:#2FA35A;--blue:#3B82D6;}
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html{scroll-padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px))}
   body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
     max-width:460px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
   .mono{font-family:"SF Mono",ui-monospace,Consolas,monospace}
@@ -20,7 +21,7 @@
   .modeb{font-size:11px;font-weight:800;letter-spacing:.05em;padding:3px 9px;border-radius:6px}
   .mode-real{background:rgba(226,74,59,.16);color:#FF8579;border:1px solid rgba(226,74,59,.5)}
   .mode-sim{background:rgba(232,163,61,.16);color:#F3C070;border:1px solid rgba(232,163,61,.5)}
-  main{flex:1;padding:14px 14px 78px;display:flex;flex-direction:column;gap:11px}
+  main{flex:1;padding:14px 14px calc(96px + env(safe-area-inset-bottom, 0px));display:flex;flex-direction:column;gap:11px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:13px 14px}
   .lbl{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700;margin-bottom:7px}
   .between{display:flex;align-items:center;justify-content:space-between}
@@ -39,7 +40,8 @@
   .seg button{flex:1;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13.5px;
     padding:9px;border-radius:7px;cursor:pointer;font-family:inherit}
   .seg button.on{background:var(--navy);color:#fff}
-  .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;height:64px;
+  .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;height:calc(64px + env(safe-area-inset-bottom, 0px));
+    padding-bottom:env(safe-area-inset-bottom, 0px);
     border-top:1px solid var(--line);background:#0c182a;display:flex}
   .tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
     color:var(--muted);font-size:9.5px;font-weight:700;border:none;background:none;cursor:pointer;font-family:inherit;padding:0 2px}
@@ -48,7 +50,7 @@
   h2{color:var(--ink);font-size:16px;margin:2px 0 2px}
   .muted{color:var(--muted)}
   .toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);background:#16324b;border:1px solid var(--steel);
-    color:#dff0ff;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:700;opacity:0;transition:.3s;z-index:30}
+    color:#dff0ff;padding:11px 16px;border-radius:10px;font-size:13px;font-weight:700;opacity:0;transition:.3s;z-index:30;pointer-events:none}
   .toast.show{opacity:1}
   @keyframes screenBlink{0%,100%{background-color:var(--bg)}50%{background-color:#3a1414}}
   body.alert-blink{animation:screenBlink .5s ease-in-out 6}
@@ -423,7 +425,7 @@ async function homeMap(){
     });
     (d.reports||[]).forEach(function(r){
       const teamNo=teamNoOf[r.team_id]||r.team_id;
-      const info = r.kind==='recon' ? `병력 ${r.troops||0} · 트럭 ${r.trucks||0} · 차량 ${r.vehicles||0}` : (r.note||'');
+      const info = r.kind==='recon' ? `병력 ${r.troops||0} · 트럭 ${r.trucks||0} · 차량 ${r.vehicles||0} · 전차 ${r.tanks||0} · 장갑차 ${r.armored||0} · 포병 ${r.artillery||0}` : (r.note||'');
       const at=r.action_taken||'none';
       let m, tip;
       if(r.hostile==1 && at==='friendly'){
@@ -504,11 +506,11 @@ async function renderDrones(){
         </div>
         <div id="rs_time_wrap" style="${REPORT_SETTINGS.mode==='time'?'':'display:none'}">
           <div class="lbl">보고 주기 (분)</div>
-          <input id="rs_minutes" type="number" min="1" value="${REPORT_SETTINGS.minutes}" style="margin-bottom:9px">
+          <input id="rs_minutes" type="number" min="1" value="${REPORT_SETTINGS.minutes}" onfocus="this.select()" style="margin-bottom:9px">
         </div>
         <div id="rs_dist_wrap" style="${REPORT_SETTINGS.mode==='distance'?'':'display:none'}">
           <div class="lbl">이동거리 기준 (m)</div>
-          <input id="rs_meters" type="number" min="10" value="${REPORT_SETTINGS.meters}" style="margin-bottom:9px">
+          <input id="rs_meters" type="number" min="10" value="${REPORT_SETTINGS.meters}" onfocus="this.select()" style="margin-bottom:9px">
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost" style="flex:1;padding:9px" onclick="manualPositionReport()">📍 지금 위치 보고</button>
@@ -614,7 +616,7 @@ function droneCard(dr){
     <input id="dr_note_${dr.id}" value="${esc(dr.note||'')}" placeholder="예: 프로펠러 교체 필요" style="margin-bottom:10px">
     <div style="display:flex;gap:6px">
       <button class="btn btn-amber" style="padding:10px;flex:1" onclick="saveDrone(${dr.id})">저장</button>
-      <button class="btn btn-ghost" style="padding:10px;flex:none" onclick="deleteDrone(${dr.id})">삭제</button>
+      <button class="btn btn-ghost" style="padding:10px;flex:1" onclick="deleteDrone(${dr.id})">삭제</button>
     </div>
   </div>`;
 }
@@ -806,13 +808,13 @@ function applyManualMGRS_r(){
   if(R_PICKER) R_PICKER.place(ll[0],ll[1]);
 }
 function numRow(id,label){return `<div class="between" style="padding:7px 0"><span>${label}</span>
-  <input id="${id}" type="number" inputmode="numeric" style="width:90px;text-align:right" value="0"></div>`;}
+  <input id="${id}" type="number" inputmode="numeric" style="width:90px;text-align:right" value="0" onfocus="this.select()"></div>`;}
 function rfields(){
   const el=document.getElementById('rfields');
   if(RKIND==='recon'){
-    el.innerHTML=`<div class="card">${numRow('r_troops','병력')}${numRow('r_trucks','트럭')}${numRow('r_vehicles','일반차량')}
+    el.innerHTML=`<div class="card">${numRow('r_troops','병력')}${numRow('r_trucks','트럭')}${numRow('r_vehicles','일반차량')}${numRow('r_tanks','전차')}${numRow('r_armored','장갑차')}${numRow('r_artillery','포병')}
       <label class="row" style="margin-top:9px;font-size:13px;padding-top:9px;border-top:1px dashed var(--line)">
-        <input type="checkbox" id="r_hostile" style="width:18px;height:18px;flex:none"> 🔺 적 식별 (지도에 적색 마름모로 표시)</label></div>`;
+        <input type="checkbox" id="r_hostile" checked style="width:18px;height:18px;flex:none"> 🔺 적 식별 (지도에 적색 마름모로 표시)</label></div>`;
   }else{
     el.innerHTML=`<div class="card">${numRow('r_armed','무장')}${numRow('r_unarmed','비무장')}
       <div class="lbl" style="margin:10px 0 6px">피해 판정</div>
@@ -825,7 +827,7 @@ async function submitReport(){
   const rla=g('r_lat'), rln=g('r_lng');
   const body={team_id:SESS.team_id,kind:RKIND,mode:MODE};
   if(rla&&rln){ body.lat=+rla; body.lng=+rln; body.coord=toMGRS(+rla,+rln)||''; }
-  if(RKIND==='recon'){Object.assign(body,{troops:+g('r_troops'),trucks:+g('r_trucks'),vehicles:+g('r_vehicles'),hostile:document.getElementById('r_hostile').checked?1:0});}
+  if(RKIND==='recon'){Object.assign(body,{troops:+g('r_troops'),trucks:+g('r_trucks'),vehicles:+g('r_vehicles'),tanks:+g('r_tanks'),armored:+g('r_armored'),artillery:+g('r_artillery'),hostile:document.getElementById('r_hostile').checked?1:0});}
   else{Object.assign(body,{armed:+g('r_armed'),unarmed:+g('r_unarmed'),kia:+g('r_kia'),serious:+g('r_serious'),minor:+g('r_minor'),failed:document.getElementById('r_failed').checked?1:0});}
   try{ await api('/reports','POST',body); toast('보고 전송됨'); renderReport(); }catch(e){ toast('전송 실패'); }
 }
