@@ -73,6 +73,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $st->execute(array($login, $hash, $role, $login));
                 $ok = true; $msg = "'" . $login . "' 계정을 생성/갱신했습니다 (역할: " . $role . ").";
             }
+        } elseif ($action === 'delete') {
+            $login = trim(isset($_POST['login_id']) ? $_POST['login_id'] : '');
+            if ($login === '') {
+                $msg = '삭제할 아이디를 선택하세요.';
+            } else {
+                $chk = $pdo->prepare("SELECT id, role FROM iuccs_users WHERE login_id = ?");
+                $chk->execute(array($login));
+                $u = $chk->fetch();
+                if (!$u) {
+                    $msg = "'" . $login . "' 계정을 찾지 못했습니다.";
+                } elseif ($u['role'] === 'admin' && (int) $pdo->query("SELECT COUNT(*) FROM iuccs_users WHERE role = 'admin'")->fetchColumn() <= 1) {
+                    $msg = '마지막 관리자 계정은 삭제할 수 없습니다.';
+                } else {
+                    $pdo->prepare("DELETE FROM iuccs_users WHERE login_id = ?")->execute(array($login));
+                    $ok = true; $msg = "'" . $login . "' 계정이 삭제되었습니다.";
+                }
+            }
         }
     } catch (Exception $e) {
         $msg = '오류: ' . $e->getMessage();
@@ -146,6 +163,21 @@ $roleKo = array('admin'=>'관리자','leader'=>'팀장','operator'=>'운용자',
       <label>새 비밀번호</label>
       <input type="text" name="password" placeholder="예: 1234" autocomplete="off">
       <button type="submit">이 계정 비밀번호 변경</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>계정 삭제</h2>
+    <form method="post" onsubmit="return confirm('이 계정을 삭제하시겠습니까?\n되돌릴 수 없습니다.');">
+      <input type="hidden" name="token" value="<?php echo $T; ?>">
+      <input type="hidden" name="action" value="delete">
+      <label>아이디</label>
+      <select name="login_id">
+        <?php foreach ($users as $u): ?>
+          <option value="<?php echo h($u['login_id']); ?>"><?php echo h($u['login_id']); ?> (<?php echo h(isset($roleKo[$u['role']]) ? $roleKo[$u['role']] : $u['role']); ?>)</option>
+        <?php endforeach; ?>
+      </select>
+      <button type="submit" class="sub" style="background:#3a1c1c;color:#ff8579">이 계정 삭제</button>
     </form>
   </div>
 
