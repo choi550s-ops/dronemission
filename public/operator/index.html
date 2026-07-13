@@ -25,6 +25,8 @@
   .card{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:13px 14px}
   .lbl{font-size:11px;letter-spacing:.12em;color:var(--muted);font-weight:700;margin-bottom:7px}
   .between{display:flex;align-items:center;justify-content:space-between}
+  .drone-line{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .drone-line:last-of-type{border-bottom:none}
   .row{display:flex;align-items:center;gap:9px}
   .val{color:var(--ink);font-weight:700}
   .chip{font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px}
@@ -142,7 +144,7 @@
     <button class="tab" data-v="missions"><span class="ic">🎯</span>임무</button>
     <button class="tab" data-v="drones"><span class="ic">👥</span>팀관리</button>
     <button class="tab" data-v="report"><span class="ic">📋</span>보고</button>
-    <button class="tab" data-v="alerts"><span class="ic">🔔</span>알림</button>
+    <button class="tab" data-v="alerts"><span class="ic">💬</span>대화</button>
   </nav>
 </div>
 
@@ -382,7 +384,7 @@ function startClock(){setInterval(()=>{
 document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('on'));
   t.classList.add('on'); go(t.dataset.v);});
-function go(v){({home:renderHome,missions:renderMissions,drones:renderDrones,report:renderReport,alerts:renderAlerts}[v])();}
+function go(v){({home:renderHome,missions:renderMissions,drones:renderDrones,report:renderReport,alerts:renderChat}[v])();}
 function doLogout(){
   if(!confirm('로그아웃 하시겠습니까?')) return;
   api('/logout','POST').catch(()=>{});
@@ -521,30 +523,54 @@ async function renderHome(){
   const v=document.getElementById('view');
   v.innerHTML='<div class="muted">불러오는 중…</div>';
   try{
-    const [d, mapD] = await Promise.all([
+    const [d, mapD, md] = await Promise.all([
       api('/drones?team_id='+(SESS.team_id||'')),
       api('/map'),
+      api('/missions?team_id='+(SESS.team_id||'')),
     ]);
     const drones=d.drones||[];
     const myTeam=(mapD.teams||[]).find(function(t){return t.id===SESS.team_id;})||{};
-    let cards=drones.map(dr=>{
-      const catTxt = dr.model_category ? ' · '+CATLBL[dr.model_category] : '';
-      return `<div class="card">
-        <div class="between" style="margin-bottom:9px"><div class="row">✈️ <span class="val">기체 ${esc(dr.code)}</span></div>
-          <span class="chip" style="background:rgba(47,163,90,.16);color:#6fe0a0">${STATLBL[dr.status]||esc(dr.status)}</span></div>
-        <div class="between" style="font-size:13px;padding:4px 0"><span class="muted">모델</span><span class="val">${esc(dr.model_name||'-')}${catTxt}</span></div>
-        ${dr.note?`<div style="font-size:12.5px;padding:4px 0;color:var(--amber)">📝 ${esc(dr.note)}</div>`:''}
+    const recent=(md.missions||[]).slice(0,8);
+    let droneLines=drones.map(dr=>{
+      const catTxt = dr.model_category ? CATLBL[dr.model_category] : '미지정';
+      const modelTxt = esc(dr.model_name||'미지정 장비');
+      return `<div class="drone-line" onclick="toggleDroneEdit(${dr.id})">
+        <span class="val" style="font-size:13px">${catTxt} · ${modelTxt}(${esc(dr.code)})</span>
+        <span class="chip" id="dline_stat_${dr.id}" style="background:rgba(47,163,90,.16);color:#6fe0a0">${STATLBL[dr.status]||esc(dr.status)}</span>
+      </div>
+      <div id="dline_edit_${dr.id}" style="display:none;padding:4px 2px 10px;gap:6px;flex-wrap:wrap" class="row">
+        <button class="btn btn-ghost" style="padding:5px 10px;font-size:11.5px" onclick="event.stopPropagation();quickSetDroneStatus(${dr.id},'available')">가용</button>
+        <button class="btn btn-ghost" style="padding:5px 10px;font-size:11.5px" onclick="event.stopPropagation();quickSetDroneStatus(${dr.id},'maintenance')">정비</button>
+        <button class="btn btn-ghost" style="padding:5px 10px;font-size:11.5px" onclick="event.stopPropagation();quickSetDroneStatus(${dr.id},'destroyed')">파괴</button>
       </div>`;}).join('');
-    if(!drones.length) cards='<div class="card muted">배정된 기체가 없습니다.</div>';
-    v.innerHTML=`<div class="between"><div class="lbl" style="margin:0">내 역할</div>
-      <span class="badge" style="background:var(--navy);color:#cfe0f0">${document.getElementById('rb_role').textContent}</span></div>
-      <div class="lbl" style="margin:12px 0 0">팀 상태 (직접 설정)</div>
+    if(!drones.length) droneLines='<div class="card muted">배정된 기체가 없습니다.</div>';
+    const alertLines = recent.length ? recent.map(m=>`<div class="card between">
+        <div class="row">${m.type==='attack'?'🔴':'🔵'} <span style="font-size:13px">${m.type==='attack'?'공격':'정찰'} 임무 · ${MSTAT[m.status]||m.status}</span></div>
+        <span class="mono muted" style="font-size:11px">#${m.id}</span></div>`).join('') : '<div class="card muted">알림이 없습니다.</div>';
+    v.innerHTML=`
+      <div class="lbl" style="margin:0">팀 상태 (직접 설정)</div>
       <div id="teamStatusSel" style="display:flex;gap:6px;margin-top:6px"></div>
       <div class="lbl" style="margin:12px 0 0">상황 지도</div>
-      <div id="home_map" class="minimap"></div>${cards}`;
+      <div id="home_map" class="minimap"></div>
+      <div class="lbl" style="margin:12px 0 6px">기체 현황</div>
+      <div class="card" style="padding:4px 12px">${droneLines}</div>
+      <div class="lbl" style="margin:16px 0 6px">임무 알림</div>
+      ${alertLines}`;
     renderTeamStatusSelector(myTeam.status);
     homeMap();
   }catch(e){ v.innerHTML=err(e); }
+}
+function toggleDroneEdit(id){
+  const el=document.getElementById('dline_edit_'+id);
+  if(!el) return;
+  el.style.display = el.style.display==='none' ? 'flex' : 'none';
+}
+async function quickSetDroneStatus(id, status){
+  try{
+    await api('/drones/update','POST',{id,status});
+    toast('기체 상태 변경됨');
+    renderHome();
+  }catch(e){ toast('변경 실패'); }
 }
 const TEAM_STATUS_OPTS=[
   {k:'unavailable', label:'운용불가', color:'#E24A3B'},
@@ -935,26 +961,18 @@ async function submitReport(){
 }
 
 // ---- ALERTS ----
-async function renderAlerts(){
+async function renderChat(){
   const v=document.getElementById('view'); v.innerHTML='<div class="muted">불러오는 중…</div>';
   try{
-    const [md, msgd] = await Promise.all([
-      api('/missions?team_id='+(SESS.team_id||'')),
-      api('/messages'),
-    ]);
-    const recent=(md.missions||[]).slice(0,8);
+    const msgd = await api('/messages');
     const msgs=msgd.messages||[];
     v.innerHTML = `
-      <h2>관리자와 메시지</h2>
+      <h2>관리자와 대화</h2>
       <div class="card">
-        <div id="op_msg_history" style="max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;margin-bottom:9px"></div>
+        <div id="op_msg_history" style="max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:7px;margin-bottom:9px"></div>
         <textarea id="op_msg_body" placeholder="메시지 입력" style="width:100%;min-height:56px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
         <button class="btn btn-amber" style="width:100%;margin-top:8px;padding:10px" onclick="opSendMessage()">전송</button>
-      </div>
-      <h2 style="margin-top:14px">임무 알림</h2>
-      ${recent.length?recent.map(m=>`<div class="card between">
-        <div class="row">${m.type==='attack'?'🔴':'🔵'} <span style="font-size:13px">${m.type==='attack'?'공격':'정찰'} 임무 · ${MSTAT[m.status]||m.status}</span></div>
-        <span class="mono muted" style="font-size:11px">#${m.id}</span></div>`).join(''):'<div class="card muted">알림이 없습니다.</div>'}`;
+      </div>`;
     renderOpMsgHistory(msgs.slice().reverse());
   }catch(e){ v.innerHTML=err(e); }
 }
@@ -962,10 +980,11 @@ function renderOpMsgHistory(msgs){
   const el=document.getElementById('op_msg_history'); if(!el) return;
   el.innerHTML = msgs.length ? msgs.map(function(m){
     const mine = m.direction==='from_team';
+    const readTag = (mine && m.read_at) ? ' · <span style="color:#6fe0a0">읽음</span>' : '';
     return `<div style="align-self:${mine?'flex-end':'flex-start'};max-width:82%;background:${mine?'var(--navy)':'var(--surface2)'};
       border-radius:9px;padding:7px 10px;font-size:12.5px">
       <div>${esc(m.body)}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:3px">${esc(String(m.created_at)).slice(5,16)}</div></div>`;
+      <div style="font-size:10px;color:var(--muted);margin-top:3px">${esc(String(m.created_at)).slice(5,16)}${readTag}</div></div>`;
   }).join('') : '<span class="muted" style="font-size:11.5px">메시지가 없습니다.</span>';
   el.scrollTop=el.scrollHeight;
 }
@@ -975,7 +994,7 @@ async function opSendMessage(){
   try{
     await api('/messages','POST',{body});
     document.getElementById('op_msg_body').value='';
-    renderAlerts();
+    renderChat();
     toast('메시지 전송됨');
   }catch(e){ toast('전송 실패'); }
 }

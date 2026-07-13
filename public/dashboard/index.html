@@ -1445,9 +1445,10 @@ async function loadMessageHistory(teamId){
     const msgs=d.messages||[];
     el.innerHTML = msgs.length ? msgs.map(function(m){
       const mine=m.direction==='to_team';
+      const readTag = (mine && m.read_at) ? ' · <span style="color:#6fe0a0">읽음</span>' : '';
       return `<div class="msg-bubble ${mine?'msg-out':'msg-in'}">
         <div>${esc(m.body)}</div>
-        <div class="msg-time">${esc(String(m.created_at)).slice(5,16)}</div></div>`;
+        <div class="msg-time">${esc(String(m.created_at)).slice(5,16)}${readTag}</div></div>`;
     }).join('') : '<span class="muted" style="font-size:11px">메시지가 없습니다.</span>';
     el.scrollTop=el.scrollHeight;
   }catch(e){ el.innerHTML='<span class="muted" style="font-size:11px">불러오기 실패</span>'; }
