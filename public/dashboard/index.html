@@ -116,7 +116,7 @@
   .pulse-highlight{animation:pulseHi 0.85s ease-in-out infinite; border:3px solid #FFD600!important}
   .wp{background:transparent!important;border:none!important;box-shadow:none!important;color:#12222f;font-weight:800;font-size:10.5px;padding:0}
   .wp:before,.wp:after{display:none!important}
-  #drawbtn.on-draw{background:linear-gradient(180deg,#E8A33D,#C9871B);color:#1a1206;border-color:transparent}
+  #drawbtn.on-draw,#fr_drawbtn.on-draw{background:linear-gradient(180deg,#E8A33D,#C9871B);color:#1a1206;border-color:transparent}
   .lyr{font-size:11.5px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--muted);cursor:pointer;user-select:none}
   .lyr.on{background:var(--navy);color:#fff;border-color:var(--steel)}
 
@@ -296,6 +296,42 @@
             <button class="btn btn-amber" style="padding:11px;flex:2" onclick="issueMission()">임무 하달</button>
           </div>
           <div class="muted" style="font-size:11px">※ 공격 임무는 승인·ROE 확인 후 하달됩니다. 경로는 하달 후 지도에 상시 표시(끄기 가능)됩니다.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="between" style="margin-bottom:4px">
+          <h2 style="margin:0">화력요청 등록</h2>
+          <button type="button" class="btn btn-ghost" id="fr_toggle" style="padding:3px 9px;font-size:10.5px" onclick="toggleFireRegForm()">▸ 펼치기</button>
+        </div>
+        <div id="fr_form_wrap" style="display:none">
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <select id="fr_team"></select>
+            <select id="fr_target_sel" onchange="onFrTargetChange()">
+              <option value="병력">병력</option><option value="전차">전차</option><option value="장갑차">장갑차</option>
+              <option value="포병">포병</option><option value="기타">기타(직접 입력)</option>
+            </select>
+            <input id="fr_target_etc" placeholder="표적 직접 입력" style="display:none">
+            <select id="fr_scale_sel" onchange="onFrScaleChange()">
+              <option value="분대">분대</option><option value="소대">소대</option><option value="중대">중대</option>
+              <option value="대대">대대</option><option value="여단">여단</option><option value="기타">기타(직접 입력)</option>
+            </select>
+            <input id="fr_scale_etc" placeholder="규모 직접 입력" style="display:none">
+            <button type="button" class="btn btn-ghost" id="fr_mgrs_toggle" style="padding:7px;font-size:12px" onclick="toggleMgrsManual('fr')">▸ 군사좌표 수동입력</button>
+            <div id="fr_mgrs_wrap" style="display:none">
+              <div class="lbl" style="margin:6px 0 0">군사좌표 수동 입력 (또는 지도 클릭)</div>
+              <div style="display:flex;gap:5px">
+                <input id="fr_mgrs_zone" class="mono" placeholder="52S" style="width:22%;text-align:center">
+                <input id="fr_mgrs_sq" class="mono" placeholder="CG" style="width:18%;text-align:center">
+                <input id="fr_mgrs_e" class="mono" placeholder="12345" style="width:30%;text-align:center">
+                <input id="fr_mgrs_n" class="mono" placeholder="67890" style="width:30%;text-align:center">
+              </div>
+              <button class="btn btn-ghost" style="padding:7px;width:100%;margin-top:6px" onclick="applyManualMGRS_fr()">↳ 좌표 적용</button>
+            </div>
+            <button class="btn btn-ghost" id="fr_drawbtn" style="padding:9px" onclick="toggleFrPick()">📍 지도에서 위치 지정</button>
+            <div class="mcoords" id="fr_coords"><span class="muted">‘위치 지정’을 켜고 좌측 COP 지도를 클릭하세요</span></div>
+            <button class="btn btn-amber" style="padding:11px" onclick="submitFireFromAdmin()">📡 화력요청 등록</button>
+            <div class="muted" style="font-size:11px">※ 정찰 결과 보고의 "🎯 화력" 버튼을 누르면 위치·표적이 자동으로 채워집니다.</div>
+          </div>
         </div>
       </div>
       <div class="card" style="flex:1;min-height:0;display:flex;flex-direction:column">
@@ -606,7 +642,7 @@ async function loadBoard(){
   }catch(e){}
 }
 
-let MAP=null, LG={teams:null,reports:null,fires:null,route:null,missionRoutes:null},
+let MAP=null, LG={teams:null,reports:null,fires:null,route:null,missionRoutes:null,frpoint:null},
   layerOn={teams:true,reports:true,fires:true,missionRoutes:true}, TEAM_MARKERS={},
   MAP_FIRST_FIT=false, LAST_PTS=[];
 function fitAllView(){
@@ -642,9 +678,12 @@ function initMap(){
   if(!MAP_STYLES[savedStyle]) savedStyle='dark';
   setMapStyle(savedStyle);
   LG.teams=L.layerGroup().addTo(MAP); LG.reports=L.layerGroup().addTo(MAP); LG.fires=L.layerGroup().addTo(MAP);
-  LG.route=L.layerGroup().addTo(MAP); LG.missionRoutes=L.layerGroup().addTo(MAP);
+  LG.route=L.layerGroup().addTo(MAP); LG.missionRoutes=L.layerGroup().addTo(MAP); LG.frpoint=L.layerGroup().addTo(MAP);
   MLINE=L.polyline([],{color:'#E8A33D',weight:3,dashArray:'6,7'}).addTo(LG.route);
-  MAP.on('click',function(e){ if(DRAW) addRoutePoint(e.latlng.lat,e.latlng.lng); });
+  MAP.on('click',function(e){
+    if(DRAW) addRoutePoint(e.latlng.lat,e.latlng.lng);
+    if(FR_PICK) setFireLocation(e.latlng.lat,e.latlng.lng);
+  });
   setTimeout(function(){ if(MAP) MAP.invalidateSize(); },250);
 }
 function flashTeam(id){
@@ -1141,6 +1180,8 @@ async function loadDash(){
     if(TD_TEAM_ID!=null) loadTeamDrawer(TD_TEAM_ID);
     const sel=document.getElementById('m_team');
     if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; redrawRoute(); }
+    const frSel=document.getElementById('fr_team');
+    if(frSel && !frSel.dataset.filled){ frSel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); frSel.dataset.filled='1'; }
   }catch(e){ if(e.error==='unauthorized') logout(); }
 }
 let OPEN_DECIDE={}, OPEN_DECIDE_TEXT={};
@@ -1245,6 +1286,7 @@ async function loadReports(){
       } else {
         actionCell=`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`;
       }
+      const fireBtn = (ROLE==='admin' && r.kind==='recon') ? fireFromReportBtn(r, coordStr) : '';
       const delBtn = ROLE==='admin' ? ` <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="deleteRow('reports',${r.id})">🗑</button>` : '';
       return `<tr><td><input type="checkbox" value="${r.id}"></td>
         <td class="mono muted" data-label="#" style="font-size:10.5px">#${r.id}</td>
@@ -1253,11 +1295,18 @@ async function loadReports(){
         <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordStr)}</td>
         <td data-label="모드"><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
         <td data-label="내용" style="font-size:12px">${esc(c)}</td>
-        <td data-label="조치">${actionCell}${delBtn}</td></tr>`;}).join('')
+        <td data-label="조치">${actionCell}${fireBtn}${delBtn}</td></tr>`;}).join('')
       :'<tr><td colspan="9" class="muted">보고 없음</td></tr>';
     const rEl=document.getElementById('reports'); if(rEl) rEl.innerHTML=html;
     const rmEl=document.getElementById('reports_modal'); if(rmEl) rmEl.innerHTML=html;
   }catch(e){}
+}
+function fireFromReportBtn(r, coordStr){
+  const coordArg=String(coordStr||'').replace(/'/g,"\\'");
+  const latArg = r.lat==null?'null':+r.lat, lngArg = r.lng==null?'null':+r.lng;
+  const targetDesc=`병력${r.troops??0}·트럭${r.trucks??0}·차량${r.vehicles??0}·전차${r.tanks??0}·장갑차${r.armored??0}·포병${r.artillery??0}`;
+  const targetArg=targetDesc.replace(/'/g,"\\'");
+  return ` <button class="btn btn-ghost" style="padding:4px 7px;font-size:10px" onclick="prefillFireFromReport(${r.team_id},${latArg},${lngArg},'${coordArg}','${targetArg}')">🎯 화력</button>`;
 }
 function hostileActionCell(r, coordStr){
   const at=r.action_taken||'none';
@@ -1486,6 +1535,85 @@ async function issueMission(){
     loadDash(); loadMap(); loadBoard();
   }catch(e){ alert(e.error==='forbidden'?'권한이 없습니다 (관리자/팀장).':'하달 실패'); }
 }
+// ---- admin fire-request registration (based on recon reports) ----
+let FR_PICK=false, FR_LAT=null, FR_LNG=null, FR_MARKER=null;
+function toggleFireRegForm(force){
+  const wrap=document.getElementById('fr_form_wrap');
+  const btn=document.getElementById('fr_toggle');
+  const open = force===true ? false : wrap.style.display!=='none';
+  wrap.style.display = open ? 'none' : 'block';
+  if(btn) btn.textContent = (open?'▸':'▾')+' 펼치기';
+  if(open && FR_PICK) toggleFrPick();
+}
+function toggleFrPick(){
+  FR_PICK=!FR_PICK;
+  if(FR_PICK && DRAW) toggleDraw();
+  const btn=document.getElementById('fr_drawbtn');
+  if(btn){ btn.classList.toggle('on-draw',FR_PICK); btn.innerHTML = FR_PICK ? '■ 위치 지정 중지' : '📍 지도에서 위치 지정'; }
+}
+function setFireLocation(lat,lng){
+  FR_LAT=lat; FR_LNG=lng;
+  if(!LG.frpoint) return;
+  LG.frpoint.clearLayers();
+  FR_MARKER=L.marker([lat,lng],{icon:L.divIcon({className:'diamond-icon',html:'<div class="diamond" style="background:#ff5b5b"></div>',iconSize:[14,14],iconAnchor:[7,7]})});
+  FR_MARKER.addTo(LG.frpoint);
+  fillMgrsBoxes(lat,lng,'fr_mgrs');
+  const teamId=+document.getElementById('fr_team').value;
+  const base=TEAMLATLNG[teamId];
+  let distTxt='';
+  if(base){ distTxt=' · 직선거리 <b>'+fmtDist(haversine(base[0],base[1],lat,lng))+'</b>'; }
+  document.getElementById('fr_coords').innerHTML='🎯 위치: <span class="mono">'+esc(toMGRS(lat,lng)||'')+'</span>'+distTxt;
+}
+function onFrTargetChange(){ document.getElementById('fr_target_etc').style.display = document.getElementById('fr_target_sel').value==='기타' ? 'block':'none'; }
+function onFrScaleChange(){ document.getElementById('fr_scale_etc').style.display = document.getElementById('fr_scale_sel').value==='기타' ? 'block':'none'; }
+function applyManualMGRS_fr(){
+  const ll=mgrsPartsToLatLng(
+    document.getElementById('fr_mgrs_zone').value, document.getElementById('fr_mgrs_sq').value,
+    document.getElementById('fr_mgrs_e').value, document.getElementById('fr_mgrs_n').value);
+  if(!ll){ toast('좌표 형식을 확인하세요 (예: 52S / CG / 12345 / 67890)'); return; }
+  setFireLocation(ll[0],ll[1]);
+  if(MAP) MAP.panTo(ll);
+}
+async function submitFireFromAdmin(){
+  const teamId=document.getElementById('fr_team').value;
+  if(!teamId){ toast('팀을 선택하세요'); return; }
+  if(FR_LAT==null||FR_LNG==null){ toast('위치를 지정하세요'); return; }
+  const target = document.getElementById('fr_target_sel').value==='기타' ? document.getElementById('fr_target_etc').value : document.getElementById('fr_target_sel').value;
+  const scale = document.getElementById('fr_scale_sel').value==='기타' ? document.getElementById('fr_scale_etc').value : document.getElementById('fr_scale_sel').value;
+  const body={team_id:teamId, target:target, scale:scale, lat:FR_LAT, lng:FR_LNG, coord:toMGRS(FR_LAT,FR_LNG)||''};
+  try{
+    await api('/fire-requests','POST',body);
+    toast('📡 화력요청 등록됨');
+    ['fr_target_etc','fr_scale_etc'].forEach(function(id){ document.getElementById(id).value=''; });
+    ['fr_mgrs_zone','fr_mgrs_sq','fr_mgrs_e','fr_mgrs_n'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('fr_target_sel').value='병력'; onFrTargetChange();
+    document.getElementById('fr_scale_sel').value='분대'; onFrScaleChange();
+    FR_LAT=null; FR_LNG=null;
+    if(LG.frpoint) LG.frpoint.clearLayers();
+    document.getElementById('fr_coords').innerHTML='<span class="muted">‘위치 지정’을 켜고 좌측 COP 지도를 클릭하세요</span>';
+    if(FR_PICK) toggleFrPick();
+    loadFires(); loadDash(); loadMap();
+  }catch(e){ toast('등록 실패'); }
+}
+function prefillFireFromReport(teamId, lat, lng, coord, targetInfo){
+  toggleFireRegForm(true);
+  const sel=document.getElementById('fr_team');
+  sel.value=teamId;
+  sel.focus();
+  sel.classList.add('pulse-highlight');
+  sel.addEventListener('change', function stopBlink(){ sel.classList.remove('pulse-highlight'); }, {once:true});
+  if(targetInfo){
+    document.getElementById('fr_target_sel').value='기타'; onFrTargetChange();
+    document.getElementById('fr_target_etc').value=targetInfo;
+  }
+  if(lat!=null && lng!=null && !isNaN(lat) && !isNaN(lng)){
+    setFireLocation(lat,lng);
+    if(MAP){ MAP.panTo([lat,lng]); }
+  }
+  document.getElementById('fr_form_wrap').scrollIntoView({behavior:'smooth', block:'center'});
+  toast('🎯 화력요청 대상 지정됨 — 팀을 확인하고 "화력요청 등록"을 누르세요');
+}
+
 function doLogout(){ if(!confirm('로그아웃 하시겠습니까?')) return; logout(); }
 function logout(){ sessionStorage.removeItem('iuccs_dash_token'); sessionStorage.removeItem('iuccs_dash_role'); location.reload(); }
 

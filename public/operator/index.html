@@ -142,7 +142,6 @@
     <button class="tab" data-v="missions"><span class="ic">🎯</span>임무</button>
     <button class="tab" data-v="drones"><span class="ic">👥</span>팀관리</button>
     <button class="tab" data-v="report"><span class="ic">📋</span>보고</button>
-    <button class="tab" data-v="fire"><span class="ic">📡</span>화력</button>
     <button class="tab" data-v="alerts"><span class="ic">🔔</span>알림</button>
   </nav>
 </div>
@@ -383,7 +382,7 @@ function startClock(){setInterval(()=>{
 document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('on'));
   t.classList.add('on'); go(t.dataset.v);});
-function go(v){({home:renderHome,missions:renderMissions,drones:renderDrones,report:renderReport,fire:renderFire,alerts:renderAlerts}[v])();}
+function go(v){({home:renderHome,missions:renderMissions,drones:renderDrones,report:renderReport,alerts:renderAlerts}[v])();}
 function doLogout(){
   if(!confirm('로그아웃 하시겠습니까?')) return;
   api('/logout','POST').catch(()=>{});
@@ -933,71 +932,6 @@ async function submitReport(){
   if(RKIND==='recon'){Object.assign(body,{troops:+g('r_troops'),trucks:+g('r_trucks'),vehicles:+g('r_vehicles'),tanks:+g('r_tanks'),armored:+g('r_armored'),artillery:+g('r_artillery'),hostile:document.getElementById('r_hostile').checked?1:0});}
   else{Object.assign(body,{armed:+g('r_armed'),unarmed:+g('r_unarmed'),kia:+g('r_kia'),serious:+g('r_serious'),minor:+g('r_minor'),failed:document.getElementById('r_failed').checked?1:0});}
   try{ await api('/reports','POST',body); toast('보고 전송됨'); renderReport(); }catch(e){ toast('전송 실패'); }
-}
-
-// ---- FIRE ----
-let F_PICKER=null;
-function renderFire(){
-  const v=document.getElementById('view');
-  v.innerHTML=`
-    <h2>화력지원 요청</h2>
-    <div class="card">
-      <div class="lbl">요청 위치 — 지도를 탭하세요</div>
-      <div id="f_map" class="pickmap"></div>
-      <button type="button" class="btn btn-ghost" id="f_mgrs_toggle" style="padding:8px;margin-top:8px;width:100%" onclick="toggleMgrsManual('f')">▸ 군사좌표 수동입력</button>
-      <div id="f_mgrs_wrap" style="display:none;margin-top:8px">
-        <div style="display:flex;gap:5px;margin-bottom:8px">
-          <input id="f_mgrs_zone" class="mono" placeholder="52S" style="width:22%;text-align:center">
-          <input id="f_mgrs_sq" class="mono" placeholder="CG" style="width:18%;text-align:center">
-          <input id="f_mgrs_e" class="mono" placeholder="12345" style="width:30%;text-align:center">
-          <input id="f_mgrs_n" class="mono" placeholder="67890" style="width:30%;text-align:center">
-        </div>
-        <button class="btn btn-ghost" style="padding:8px;width:100%" onclick="applyManualMGRS_f()">↳ 좌표 적용</button>
-      </div>
-      <input type="hidden" id="f_lat"><input type="hidden" id="f_lng">
-    </div>
-    <div class="card">
-      <div class="lbl">표적</div>
-      <select id="f_target_sel" onchange="onFTargetChange()">
-        <option value="병력">병력</option><option value="전차">전차</option><option value="장갑차">장갑차</option>
-        <option value="포병">포병</option><option value="기타">기타(직접 입력)</option>
-      </select>
-      <input id="f_target_etc" placeholder="표적 직접 입력" style="display:none;margin-top:7px">
-    </div>
-    <div class="card">
-      <div class="lbl">규모</div>
-      <select id="f_scale_sel" onchange="onFScaleChange()">
-        <option value="분대">분대</option><option value="소대">소대</option><option value="중대">중대</option>
-        <option value="대대">대대</option><option value="여단">여단</option><option value="기타">기타(직접 입력)</option>
-      </select>
-      <input id="f_scale_etc" placeholder="규모 직접 입력" style="display:none;margin-top:7px">
-    </div>
-    <button class="btn btn-amber" style="margin-top:4px" onclick="submitFire()">📡 요청 전송</button>`;
-  F_PICKER=mountPicker('f_map',function(la,ln){
-    document.getElementById('f_lat').value=la.toFixed(6);
-    document.getElementById('f_lng').value=ln.toFixed(6);
-    fillMgrsBoxes(la,ln,'f_mgrs');
-  });
-}
-function onFTargetChange(){ document.getElementById('f_target_etc').style.display = document.getElementById('f_target_sel').value==='기타' ? 'block':'none'; }
-function onFScaleChange(){ document.getElementById('f_scale_etc').style.display = document.getElementById('f_scale_sel').value==='기타' ? 'block':'none'; }
-function applyManualMGRS_f(){
-  const ll=mgrsPartsToLatLng(
-    document.getElementById('f_mgrs_zone').value, document.getElementById('f_mgrs_sq').value,
-    document.getElementById('f_mgrs_e').value, document.getElementById('f_mgrs_n').value);
-  if(!ll){ toast('좌표 형식을 확인하세요 (예: 52S / CG / 12345 / 67890)'); return; }
-  document.getElementById('f_lat').value=ll[0].toFixed(6);
-  document.getElementById('f_lng').value=ll[1].toFixed(6);
-  if(F_PICKER) F_PICKER.place(ll[0],ll[1]);
-}
-async function submitFire(){
-  const g=id=>{const e=document.getElementById(id); return e?e.value:'';};
-  const target = g('f_target_sel')==='기타' ? g('f_target_etc') : g('f_target_sel');
-  const scale = g('f_scale_sel')==='기타' ? g('f_scale_etc') : g('f_scale_sel');
-  const body={team_id:SESS.team_id,target:target,scale:scale,mode:MODE};
-  const fla=g('f_lat'), fln=g('f_lng');
-  if(fla&&fln){ body.lat=+fla; body.lng=+fln; body.coord=toMGRS(+fla,+fln)||''; }
-  try{ await api('/fire-requests','POST',body); toast('화력요청 전송됨'); }catch(e){ toast('전송 실패'); }
 }
 
 // ---- ALERTS ----
