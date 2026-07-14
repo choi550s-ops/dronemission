@@ -518,7 +518,7 @@ function toMGRS(lat,lng){
 }
 function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
 function teamCoordText(lat,lng){ const m=toMGRS(lat,lng); return m||'GPS 위치 없음'; }
-const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병'],['command_post','지휘소']];
+const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병'],['mortar','박격포'],['command_post','지휘소']];
 const ACTIVITY_LABELS_D={moving:'이동중',defending:'방어중',attacking:'공격중'};
 const DIRECTION_OPTS_D=['북','북동','동','남동','남','남서','서','북서'];
 const KIND_LABELS_D={recon:'정찰',attack:'공격',damage:'피해평가',photo:'사진'};
@@ -530,7 +530,7 @@ function reconTargetSummary(r){
   let s = parts.length ? parts.join(' · ') : '식별된 표적 없음';
   if(r.activity){
     s += ' · '+(ACTIVITY_LABELS_D[r.activity]||r.activity);
-    if(r.activity==='moving' && r.direction){ s += '('+r.direction+')'; }
+    if((r.activity==='moving'||r.activity==='attacking') && r.direction){ s += '('+r.direction+')'; }
   }
   return s;
 }
@@ -1398,14 +1398,14 @@ function activityEditHtmlD(r){
   }).join('');
   return `<div class="lbl" style="margin-top:10px;margin-bottom:6px">행동</div>
     <div class="seg" id="re_activity_seg">${btns}</div>
-    <select id="re_direction" style="display:${cur==='moving'?'block':'none'};margin-top:8px">${DIRECTION_OPTS_D.map(function(d){return `<option value="${d}" ${r.direction===d?'selected':''}>${d}</option>`;}).join('')}</select>`;
+    <select id="re_direction" style="display:${(cur==='moving'||cur==='attacking')?'block':'none'};margin-top:8px">${DIRECTION_OPTS_D.map(function(d){return `<option value="${d}" ${r.direction===d?'selected':''}>${d}</option>`;}).join('')}</select>`;
 }
 function setActivityEditD(v){
   const seg=document.getElementById('re_activity_seg');
   const already = seg ? seg.querySelector(`button[data-v="${v}"]`).classList.contains('on') : false;
   if(seg) seg.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', !already && b.dataset.v===v); });
   const dirEl=document.getElementById('re_direction');
-  if(dirEl) dirEl.style.display = (!already && v==='moving') ? 'block' : 'none';
+  if(dirEl) dirEl.style.display = (!already && (v==='moving'||v==='attacking')) ? 'block' : 'none';
 }
 function mgrsEditFieldsHtmlD(r){
   const mgrs = (r.lat!=null && r.lng!=null) ? toMGRS(+r.lat,+r.lng) : null;
@@ -1454,7 +1454,7 @@ async function saveReportEditD(id, kind){
     const actSeg=document.getElementById('re_activity_seg');
     const actBtn=actSeg?actSeg.querySelector('button.on'):null;
     body.activity = actBtn ? actBtn.dataset.v : null;
-    body.direction = (body.activity==='moving') ? document.getElementById('re_direction').value : null;
+    body.direction = (body.activity==='moving'||body.activity==='attacking') ? document.getElementById('re_direction').value : null;
   }else if(kind==='attack'){
     const seg=document.getElementById('re_attack_result_seg');
     const activeBtn=seg?seg.querySelector('button.on'):null;

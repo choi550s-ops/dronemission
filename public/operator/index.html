@@ -1125,7 +1125,7 @@ function onUnidentifiedToggle(){
   if(hostileEl){ hostileEl.disabled=checked; if(checked) hostileEl.checked=false; }
   if(hostileRow) hostileRow.style.opacity = checked ? '.45' : '1';
 }
-const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병'],['command_post','지휘소']];
+const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병'],['mortar','박격포'],['command_post','지휘소']];
 const DIRECTION_OPTS=['북','북동','동','남동','남','남서','서','북서'];
 const ACTIVITY_LABELS={moving:'이동중',defending:'방어중',attacking:'공격중'};
 function reconTargetSummary(r){
@@ -1134,7 +1134,7 @@ function reconTargetSummary(r){
   let s = parts.length ? parts.join(' · ') : '식별된 표적 없음';
   if(r.activity){
     s += ' · '+(ACTIVITY_LABELS[r.activity]||r.activity);
-    if(r.activity==='moving' && r.direction){ s += '('+r.direction+')'; }
+    if((r.activity==='moving'||r.activity==='attacking') && r.direction){ s += '('+r.direction+')'; }
   }
   return s;
 }
@@ -1164,7 +1164,7 @@ function rfields(){
         const already=b.classList.contains('on');
         document.querySelectorAll('#r_activity_seg button').forEach(function(x){x.classList.remove('on');});
         if(!already) b.classList.add('on');
-        document.getElementById('r_direction').style.display=(!already && b.dataset.v==='moving')?'block':'none';
+        document.getElementById('r_direction').style.display=(!already && (b.dataset.v==='moving'||b.dataset.v==='attacking'))?'block':'none';
       };
     });
   }else if(RKIND==='attack'){
@@ -1214,7 +1214,7 @@ async function submitReport(){
     const activityBtn=document.querySelector('#r_activity_seg button.on');
     if(activityBtn){
       body.activity=activityBtn.dataset.v;
-      if(body.activity==='moving'){ body.direction=document.getElementById('r_direction').value; }
+      if(body.activity==='moving'||body.activity==='attacking'){ body.direction=document.getElementById('r_direction').value; }
     }
   }
   else if(RKIND==='attack'){
@@ -1266,14 +1266,14 @@ function activityEditHtml(r, idSuffix){
   }).join('');
   return `<div class="lbl" style="margin-top:10px;margin-bottom:6px">행동</div>
     <div class="seg" id="re_activity_seg_${idSuffix}">${btns}</div>
-    <select id="re_direction_${idSuffix}" style="display:${cur==='moving'?'block':'none'};margin-top:8px">${DIRECTION_OPTS.map(function(d){return `<option value="${d}" ${r.direction===d?'selected':''}>${d}</option>`;}).join('')}</select>`;
+    <select id="re_direction_${idSuffix}" style="display:${(cur==='moving'||cur==='attacking')?'block':'none'};margin-top:8px">${DIRECTION_OPTS.map(function(d){return `<option value="${d}" ${r.direction===d?'selected':''}>${d}</option>`;}).join('')}</select>`;
 }
 function setActivityEdit(idSuffix, v){
   const seg=document.getElementById('re_activity_seg_'+idSuffix);
   const already = seg ? seg.querySelector(`button[data-v="${v}"]`).classList.contains('on') : false;
   if(seg) seg.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', !already && b.dataset.v===v); });
   const dirEl=document.getElementById('re_direction_'+idSuffix);
-  if(dirEl) dirEl.style.display = (!already && v==='moving') ? 'block' : 'none';
+  if(dirEl) dirEl.style.display = (!already && (v==='moving'||v==='attacking')) ? 'block' : 'none';
 }
 function reportCardHtml(r){
   const kindLbl = KIND_LABELS[r.kind] || r.kind;
@@ -1347,7 +1347,7 @@ async function saveReportEdit(id, kind){
     const actSeg=document.getElementById('re_activity_seg_'+id);
     const actBtn=actSeg?actSeg.querySelector('button.on'):null;
     body.activity = actBtn ? actBtn.dataset.v : null;
-    body.direction = (body.activity==='moving') ? document.getElementById('re_direction_'+id).value : null;
+    body.direction = (body.activity==='moving'||body.activity==='attacking') ? document.getElementById('re_direction_'+id).value : null;
   }else if(kind==='attack'){
     const seg=document.getElementById('re_attack_result_seg_'+id);
     const activeBtn=seg?seg.querySelector('button.on'):null;
