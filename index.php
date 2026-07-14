@@ -153,7 +153,7 @@ function route($path, $method)
                FROM iuccs_teams WHERE lat IS NOT NULL ORDER BY team_no"
         )->fetchAll();
         $reports = $pdo->query(
-            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery, hostile, action_taken, note, created_at
+            "SELECT id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery, unidentified, hostile, action_taken, note, created_at
                FROM iuccs_reports WHERE lat IS NOT NULL ORDER BY created_at DESC LIMIT 50"
         )->fetchAll();
         $fires = $pdo->query(
@@ -453,8 +453,9 @@ function route($path, $method)
         Auth::require_auth();
         $missions = $pdo->query("SELECT * FROM iuccs_missions ORDER BY issued_at DESC LIMIT 100")->fetchAll();
         $reps = $pdo->query(
-            "SELECT id, mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery,
-                    armed, unarmed, kia, serious, minor, failed, hostile, acknowledged, created_at
+            "SELECT id, mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery, unidentified,
+                    armed, unarmed, kia, serious, minor, destroyed, heavy_damage, light_damage, failed, hostile, acknowledged,
+                    attack_result, attack_result_note, created_at
                FROM iuccs_reports WHERE mission_id IS NOT NULL ORDER BY created_at DESC"
         )->fetchAll();
         $byM = array();
@@ -608,17 +609,17 @@ function route($path, $method)
         $attackResult = in_array(pval($b, 'attack_result', ''), array('hit', 'unknown', 'other'), true) ? $b['attack_result'] : null;
         $st  = $pdo->prepare(
             "INSERT INTO iuccs_reports
-                (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery,
+                (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery, unidentified,
                  armed, unarmed, scale, kia, serious, minor, destroyed, heavy_damage, light_damage, failed, note, hostile,
                  attack_result, attack_result_note)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'mission_id'), pval($b, 'team_id', $s['team_id']), $kind,
             (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real', pval($b, 'coord'),
             pval($b, 'lat'), pval($b, 'lng'),
             pval($b, 'troops'), pval($b, 'trucks'), pval($b, 'vehicles'),
-            pval($b, 'tanks'), pval($b, 'armored'), pval($b, 'artillery'),
+            pval($b, 'tanks'), pval($b, 'armored'), pval($b, 'artillery'), pval($b, 'unidentified'),
             pval($b, 'armed'), pval($b, 'unarmed'), pval($b, 'scale'),
             pval($b, 'kia'), pval($b, 'serious'), pval($b, 'minor'),
             pval($b, 'destroyed'), pval($b, 'heavy_damage'), pval($b, 'light_damage'),
@@ -641,7 +642,7 @@ function route($path, $method)
             if (!$row || $row['team_id'] != $s['team_id']) { json_out(array('error' => 'forbidden'), 403); }
         }
         $fields = array(
-            'troops', 'trucks', 'vehicles', 'tanks', 'armored', 'artillery', 'hostile',
+            'troops', 'trucks', 'vehicles', 'tanks', 'armored', 'artillery', 'unidentified', 'hostile',
             'armed', 'unarmed', 'kia', 'serious', 'minor', 'destroyed', 'heavy_damage', 'light_damage', 'failed', 'note',
             'attack_result', 'attack_result_note',
         );
