@@ -514,6 +514,7 @@ function toMGRS(lat,lng){
 function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
 function teamCoordText(lat,lng){ const m=toMGRS(lat,lng); return m||'GPS 위치 없음'; }
 const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병']];
+const KIND_LABELS_D={recon:'정찰',attack:'공격',damage:'피해평가',photo:'사진'};
 function reconTargetSummary(r){
   const parts=RECON_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
   return parts.length ? parts.join(' · ') : '식별된 표적 없음';
@@ -1291,8 +1292,11 @@ async function loadReports(){
       SEEN_MAX_REPORT=Math.max(SEEN_MAX_REPORT,maxId);
     }
     const html = rs.length?rs.map(r=>{
-      let c=r.kind==='recon'?`${reconTargetSummary(r)}${r.hostile==1?' · 🔺적식별':''}`
-        :`무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}`;
+      let c;
+      if(r.kind==='recon') c=`${reconTargetSummary(r)}${r.hostile==1?' · 🔺적식별':''}`;
+      else if(r.kind==='attack') c=`무장 ${r.armed??0}·비무장 ${r.unarmed??0}`;
+      else if(r.kind==='damage') c=`사망 ${r.kia??0}·중상 ${r.serious??0}·경상 ${r.minor??0}${r.failed==1?' · 임무실패':''}`;
+      else c=esc(r.note||'');
       const teamNo=TEAMNO[r.team_id]||r.team_id;
       const coordStr=coordText(r.lat,r.lng,r.coord);
       let actionCell;
@@ -1309,7 +1313,7 @@ async function loadReports(){
       return `<tr><td><input type="checkbox" value="${r.id}"></td>
         <td class="mono muted" data-label="#" style="font-size:10.5px">#${r.id}</td>
         <td class="muted mono" data-label="시각" style="font-size:11px">${esc(String(r.created_at)).slice(5,16)}</td>
-        <td data-label="팀" style="color:${teamColorForNo(teamNo)};font-weight:700">${esc(teamNo)}팀</td><td data-label="종류">${r.kind==='recon'?'정찰':(r.kind==='attack'?'공격':'사진')}</td>
+        <td data-label="팀" style="color:${teamColorForNo(teamNo)};font-weight:700">${esc(teamNo)}팀</td><td data-label="종류">${KIND_LABELS_D[r.kind]||r.kind}</td>
         <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordStr)}</td>
         <td data-label="모드"><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
         <td data-label="내용" style="font-size:12px">${esc(c)}</td>
@@ -1327,11 +1331,15 @@ function openReportEditModal(id){
     body.innerHTML = RECON_FIELD_LABELS.map(function(l){ return numRowEditD('re_'+l[0], l[1], r[l[0]]||0); }).join('')
       + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_hostile" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`
       + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'recon')">저장</button>`;
-  } else {
-    const lbls={armed:'무장',unarmed:'비무장',kia:'사망',serious:'중상',minor:'경상'};
-    body.innerHTML = ['armed','unarmed','kia','serious','minor'].map(function(k){ return numRowEditD('re_'+k, lbls[k], r[k]||0); }).join('')
-      + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_failed" ${r.failed==1?'checked':''} style="width:18px;height:18px;flex:none"> 임무 실패</label>`
+  } else if(r.kind==='attack'){
+    const lbls={armed:'무장',unarmed:'비무장'};
+    body.innerHTML = ['armed','unarmed'].map(function(k){ return numRowEditD('re_'+k, lbls[k], r[k]||0); }).join('')
       + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'attack')">저장</button>`;
+  } else {
+    const lbls={kia:'사망',serious:'중상',minor:'경상'};
+    body.innerHTML = ['kia','serious','minor'].map(function(k){ return numRowEditD('re_'+k, lbls[k], r[k]||0); }).join('')
+      + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_failed" ${r.failed==1?'checked':''} style="width:18px;height:18px;flex:none"> 임무 실패</label>`
+      + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'damage')">저장</button>`;
   }
   openModalEl('modal_report_edit');
 }
@@ -1343,8 +1351,10 @@ async function saveReportEditD(id, kind){
   if(kind==='recon'){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('re_'+l[0]); body[l[0]]=v>0?v:null; });
     body.hostile=document.getElementById('re_hostile').checked?1:0;
+  }else if(kind==='attack'){
+    ['armed','unarmed'].forEach(function(k){ body[k]=+g('re_'+k); });
   }else{
-    ['armed','unarmed','kia','serious','minor'].forEach(function(k){ body[k]=+g('re_'+k); });
+    ['kia','serious','minor'].forEach(function(k){ body[k]=+g('re_'+k); });
     body.failed=document.getElementById('re_failed').checked?1:0;
   }
   try{

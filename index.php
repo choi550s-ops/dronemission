@@ -603,7 +603,7 @@ function route($path, $method)
     if ($path === '/api/reports' && $method === 'POST') {
         $s   = Auth::require_auth();
         $b   = body_json();
-        $kind = in_array(pval($b, 'kind', ''), array('recon', 'attack', 'photo'), true) ? $b['kind'] : 'recon';
+        $kind = in_array(pval($b, 'kind', ''), array('recon', 'attack', 'photo', 'damage'), true) ? $b['kind'] : 'recon';
         $st  = $pdo->prepare(
             "INSERT INTO iuccs_reports
                 (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery,

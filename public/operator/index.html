@@ -903,7 +903,7 @@ function renderReport(){
   const v=document.getElementById('view');
   v.innerHTML=`
     <h2>결과 보고</h2>
-    <div class="seg" id="rkind"><button data-k="recon" class="on">정찰</button><button data-k="attack">공격 / 피해</button></div>
+    <div class="seg" id="rkind"><button data-k="recon" class="on">정찰</button><button data-k="attack">공격</button><button data-k="damage">피해평가</button></div>
     <div class="card">
       <div class="lbl">식별 위치 — 지도를 탭하세요</div>
       <div id="r_map" class="pickmap"></div>
@@ -955,9 +955,11 @@ function rfields(){
     el.innerHTML=`<div class="card">${numRow('r_troops','병력')}${numRow('r_trucks','트럭')}${numRow('r_vehicles','일반차량')}${numRow('r_tanks','전차')}${numRow('r_armored','장갑차')}${numRow('r_artillery','포병')}
       <label class="row" style="margin-top:9px;font-size:13px;padding-top:9px;border-top:1px dashed var(--line)">
         <input type="checkbox" id="r_hostile" checked style="width:18px;height:18px;flex:none"> 🔺 적 식별 (지도에 적색 마름모로 표시)</label></div>`;
+  }else if(RKIND==='attack'){
+    el.innerHTML=`<div class="card">${numRow('r_armed','무장')}${numRow('r_unarmed','비무장')}</div>`;
   }else{
-    el.innerHTML=`<div class="card">${numRow('r_armed','무장')}${numRow('r_unarmed','비무장')}
-      <div class="lbl" style="margin:10px 0 6px">피해 판정</div>
+    el.innerHTML=`<div class="card">
+      <div class="lbl" style="margin-bottom:6px">피해 판정</div>
       ${numRow('r_kia','사망')}${numRow('r_serious','중상')}${numRow('r_minor','경상')}
       <label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="r_failed" style="width:18px;height:18px"> 임무 실패</label></div>`;
   }
@@ -971,7 +973,12 @@ async function submitReport(){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('r_'+l[0]); if(v>0) body[l[0]]=v; });
     body.hostile=document.getElementById('r_hostile').checked?1:0;
   }
-  else{Object.assign(body,{armed:+g('r_armed'),unarmed:+g('r_unarmed'),kia:+g('r_kia'),serious:+g('r_serious'),minor:+g('r_minor'),failed:document.getElementById('r_failed').checked?1:0});}
+  else if(RKIND==='attack'){
+    const armed=+g('r_armed'), unarmed=+g('r_unarmed');
+    if(armed>0) body.armed=armed;
+    if(unarmed>0) body.unarmed=unarmed;
+  }
+  else{Object.assign(body,{kia:+g('r_kia'),serious:+g('r_serious'),minor:+g('r_minor'),failed:document.getElementById('r_failed').checked?1:0});}
   try{ await api('/reports','POST',body); toast('보고 전송됨'); renderReport(); }catch(e){ toast('전송 실패'); }
 }
 async function loadMyReports(){
@@ -984,16 +991,26 @@ async function loadMyReports(){
     el.innerHTML = reports.length ? reports.map(reportCardHtml).join('') : '<div class="card muted">등록된 보고가 없습니다.</div>';
   }catch(e){ el.innerHTML='<div class="warn">불러오기 실패</div>'; }
 }
+const KIND_LABELS={recon:'정찰',attack:'공격',damage:'피해평가',photo:'사진'};
 function reportCardHtml(r){
-  const kindLbl = r.kind==='recon' ? '정찰' : (r.kind==='attack' ? '공격/피해' : '사진');
-  const summary = r.kind==='recon' ? reconTargetSummary(r) : `무장 ${r.armed??0}·비무장 ${r.unarmed??0}·사망 ${r.kia??0}·중상 ${r.serious??0}·경상 ${r.minor??0}`;
+  const kindLbl = KIND_LABELS[r.kind] || r.kind;
+  let summary;
+  if(r.kind==='recon') summary=reconTargetSummary(r);
+  else if(r.kind==='attack') summary=`무장 ${r.armed??0}·비무장 ${r.unarmed??0}`;
+  else if(r.kind==='damage') summary=`사망 ${r.kia??0}·중상 ${r.serious??0}·경상 ${r.minor??0}${r.failed==1?' · 임무실패':''}`;
+  else summary=r.note||'';
   const hostileTag = (r.kind==='recon' && r.hostile==1) ? ' · 🔺적식별' : '';
   const timeStr=esc(String(r.created_at||'')).slice(5,16);
-  const editFields = r.kind==='recon'
-    ? RECON_FIELD_LABELS.map(function(l){ return numRowEdit('re_'+l[0]+'_'+r.id, l[1], r[l[0]]||0); }).join('')
-      + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_hostile_${r.id}" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`
-    : ['armed','unarmed','kia','serious','minor'].map(function(k){ return numRowEdit('re_'+k+'_'+r.id, {armed:'무장',unarmed:'비무장',kia:'사망',serious:'중상',minor:'경상'}[k], r[k]||0); }).join('')
+  let editFields;
+  if(r.kind==='recon'){
+    editFields = RECON_FIELD_LABELS.map(function(l){ return numRowEdit('re_'+l[0]+'_'+r.id, l[1], r[l[0]]||0); }).join('')
+      + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_hostile_${r.id}" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`;
+  }else if(r.kind==='attack'){
+    editFields = ['armed','unarmed'].map(function(k){ return numRowEdit('re_'+k+'_'+r.id, {armed:'무장',unarmed:'비무장'}[k], r[k]||0); }).join('');
+  }else{
+    editFields = ['kia','serious','minor'].map(function(k){ return numRowEdit('re_'+k+'_'+r.id, {kia:'사망',serious:'중상',minor:'경상'}[k], r[k]||0); }).join('')
       + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_failed_${r.id}" ${r.failed==1?'checked':''} style="width:18px;height:18px;flex:none"> 임무 실패</label>`;
+  }
   return `<div class="card" id="rcard_${r.id}">
     <div class="between">
       <span style="font-size:12.5px"><b>${kindLbl}</b> · ${timeStr}${hostileTag}</span>
@@ -1019,8 +1036,10 @@ async function saveReportEdit(id, kind){
   if(kind==='recon'){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('re_'+l[0]); body[l[0]]=v>0?v:null; });
     body.hostile=document.getElementById('re_hostile_'+id).checked?1:0;
+  }else if(kind==='attack'){
+    ['armed','unarmed'].forEach(function(k){ body[k]=+g('re_'+k); });
   }else{
-    ['armed','unarmed','kia','serious','minor'].forEach(function(k){ body[k]=+g('re_'+k); });
+    ['kia','serious','minor'].forEach(function(k){ body[k]=+g('re_'+k); });
     body.failed=document.getElementById('re_failed_'+id).checked?1:0;
   }
   try{ await api('/reports/update','POST',body); toast('보고 수정됨'); loadMyReports(); }catch(e){ toast('수정 실패'); }
