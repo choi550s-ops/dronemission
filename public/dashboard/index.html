@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
 <title>IUCCS · 관제 대시보드</title>
 <style>
   :root{--bg:#0A111E;--panel:#0E1A2E;--surface:#152439;--surface2:#0b1626;--line:#24384F;
@@ -36,6 +37,7 @@
   .btn-ghost{background:transparent;border:1px solid var(--steel);color:#CFE0F0}
   select,input{background:var(--surface2);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:7px 8px;font-size:12.5px;font-family:inherit;width:100%}
   .muted{color:var(--muted)}
+  a[href^="tel:"],a[href^="sms:"]{color:inherit!important;text-decoration:none!important}
   .between{display:flex;align-items:center;justify-content:space-between}
   /* login overlay */
   #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
