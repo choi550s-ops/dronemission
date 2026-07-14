@@ -422,11 +422,16 @@ function route($path, $method)
         $s   = Auth::require_auth();
         $tid = pval($_GET, 'team_id');
         if ($s['role'] !== 'admin') { $tid = $s['team_id']; }
-        if ($tid) {
+        $peek = pval($_GET, 'peek');
+        if ($tid && !$peek) {
             // Viewing this team's conversation marks the OTHER party's messages as read.
+            // (Skipped when peek=1 — background polling shouldn't silently mark unread
+            // messages as read before the person actually opens the conversation.)
             $otherDir = ($s['role'] === 'admin') ? 'from_team' : 'to_team';
             $pdo->prepare("UPDATE iuccs_messages SET read_at = NOW() WHERE team_id = ? AND direction = ? AND read_at IS NULL")
                 ->execute(array($tid, $otherDir));
+        }
+        if ($tid) {
             $st = $pdo->prepare("SELECT * FROM iuccs_messages WHERE team_id = ? ORDER BY created_at ASC LIMIT 100");
             $st->execute(array($tid));
         } else {
