@@ -360,6 +360,12 @@
       <div class="between" style="margin-bottom:2px;flex:none">
         <h2 style="margin:0">임무 지시 현황판</h2>
         <div style="display:flex;align-items:center;gap:10px">
+          <select id="board_type_filter" onchange="loadBoard()" style="padding:3px 7px;font-size:10.5px;width:auto">
+            <option value="">전체 유형</option>
+            <option value="recon">정찰</option>
+            <option value="attack">공격</option>
+            <option value="damage">피해평가</option>
+          </select>
           <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);cursor:pointer">
             <input type="checkbox" id="chk_show_cancelled" onchange="loadBoard()" style="width:13px;height:13px"> 취소된 임무 표시
           </label>
@@ -376,6 +382,13 @@
       <div class="between" style="flex:none">
         <h2 style="margin:0">최근 보고 (전체)</h2>
         <div style="display:flex;align-items:center;gap:10px">
+          <select id="reports_kind_filter" onchange="loadReports()" style="padding:3px 7px;font-size:10.5px;width:auto">
+            <option value="">전체 종류</option>
+            <option value="recon">정찰</option>
+            <option value="attack">공격</option>
+            <option value="damage">피해평가</option>
+            <option value="photo">사진</option>
+          </select>
           <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="bulkDelete('reports','')">선택 삭제</button>
           <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="openModalEl('modal_reports')">⤢ 펼쳐보기</button>
         </div>
@@ -673,8 +686,10 @@ async function loadBoard(){
   try{
     const d=await api('/missions/board');
     const showCancelled = document.getElementById('chk_show_cancelled') ? document.getElementById('chk_show_cancelled').checked : false;
+    const typeFilter = document.getElementById('board_type_filter') ? document.getElementById('board_type_filter').value : '';
     let all=(d.missions||[]);
     if(!showCancelled){ all = all.filter(function(m){ return m.status!=='cancelled'; }); }
+    if(typeFilter){ all = all.filter(function(m){ return m.type===typeFilter; }); }
     const build=function(ms,suffix){
       return ms.length ? ms.map(function(m){ return boardRowHtml(m,suffix); }).join('')
         : '<tr><td colspan="10" class="muted">표시할 임무가 없습니다.</td></tr>';
@@ -1329,12 +1344,17 @@ async function submitDecide(id,suffix){
 async function fstat(id,status){ try{ await api('/fire-requests/status','POST',{id,status,fire_time:null}); loadFires(); }catch(e){alert('권한이 없거나 실패했습니다.');} }
 
 async function loadReports(){
-  try{ const d=await api('/reports'); const rs=(d.reports||[]).slice(0,20);
+  try{ const d=await api('/reports');
+    const allReports = d.reports||[];
+    const kindFilter = document.getElementById('reports_kind_filter') ? document.getElementById('reports_kind_filter').value : '';
+    let filtered = allReports;
+    if(kindFilter){ filtered = filtered.filter(function(r){ return r.kind===kindFilter; }); }
+    const rs = filtered.slice(0,20);
     LAST_REPORTS=rs;
-    if(rs.length){
-      const maxId=Math.max.apply(null, rs.map(function(r){return r.id;}));
+    if(allReports.length){
+      const maxId=Math.max.apply(null, allReports.map(function(r){return r.id;}));
       if(FIRST_POLL_DONE && maxId>SEEN_MAX_REPORT){
-        const newest=rs.reduce(function(a,b){return a.id>b.id?a:b;});
+        const newest=allReports.reduce(function(a,b){return a.id>b.id?a:b;});
         const tno=TEAMNO[newest.team_id]||newest.team_id;
         notifyAlert((newest.hostile==1?'🔺 적 식별 보고 — ':'📋 새 보고 — ')+tno+'팀');
       }
