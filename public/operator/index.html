@@ -47,6 +47,9 @@
     border-top:1px solid var(--line)}
   .status-chip{flex:1;border:1.5px solid;background:transparent;font-weight:800;font-size:11px;
     padding:9px 2px;border-radius:8px;cursor:pointer;font-family:inherit;transition:.15s}
+  .stepper-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);
+    font-size:18px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;display:flex;align-items:center;justify-content:center;flex:none}
+  .stepper-btn:active{background:var(--navy);border-color:var(--navy)}
   .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;height:calc(64px + env(safe-area-inset-bottom, 0px));
     z-index:40;
     padding-bottom:env(safe-area-inset-bottom, 0px);
@@ -603,6 +606,7 @@ const CATLBL={attack:'공격',recon:'정찰'};
 const ROLES=['공격','로봇','정찰','지원','통신','사이버'];
 let DRONE_MODELS=[];
 let EDITING_MEMBER=null;
+let TEAM_SUBTAB='members';
 async function renderDrones(){
   const v=document.getElementById('view');
   v.innerHTML='<div class="muted">불러오는 중…</div>';
@@ -616,6 +620,34 @@ async function renderDrones(){
     const members=mm.members||[];
     const drones=dd.drones||[];
     v.innerHTML = `<h2>팀관리</h2>
+      <div class="seg" id="team_subtab_seg" style="margin-bottom:12px">
+        <button type="button" data-t="members" class="${TEAM_SUBTAB==='members'?'on':''}">팀원 관리</button>
+        <button type="button" data-t="drones" class="${TEAM_SUBTAB==='drones'?'on':''}">기체관리</button>
+        <button type="button" data-t="settings" class="${TEAM_SUBTAB==='settings'?'on':''}">위치보고설정</button>
+      </div>
+      <div id="team_subtab_content"></div>`;
+    document.querySelectorAll('#team_subtab_seg button').forEach(function(b){
+      b.onclick=function(){ TEAM_SUBTAB=b.dataset.t; renderTeamSubtabContent(members, drones); document.querySelectorAll('#team_subtab_seg button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); };
+    });
+    renderTeamSubtabContent(members, drones);
+  }catch(e){ v.innerHTML=err(e); }
+}
+function renderTeamSubtabContent(members, drones){
+  const el=document.getElementById('team_subtab_content');
+  if(!el) return;
+  if(TEAM_SUBTAB==='drones'){
+    el.innerHTML = `
+      <div class="lbl" style="margin-top:2px">기체 현황</div>
+      <div id="dronelist" style="display:flex;flex-direction:column;gap:10px">${drones.length?'':'<div class="card muted">배정된 기체가 없습니다.</div>'}</div>
+      <div class="card" style="margin-top:4px">
+        <div class="lbl">신규 기체 등록</div>
+        <input id="nd_code" placeholder="호수 (예: 1호수)" style="margin-bottom:8px">
+        <select id="nd_model" style="margin-bottom:8px">${modelOptions()}</select>
+        <button class="btn btn-ghost" style="padding:10px" onclick="createDrone()">+ 기체 추가</button>
+      </div>`;
+    document.getElementById('dronelist').innerHTML = drones.map(function(dr){ return droneCard(dr); }).join('');
+  }else if(TEAM_SUBTAB==='settings'){
+    el.innerHTML = `
       <div class="card">
         <div class="lbl">위치 보고 설정</div>
         <label class="row" style="font-size:13px;margin-bottom:9px">
@@ -638,25 +670,7 @@ async function renderDrones(){
           <button class="btn btn-amber" style="flex:1;padding:9px" onclick="saveReportSettings()">설정 저장</button>
         </div>
         <div class="geo" id="rs_last" style="margin-top:8px">${REPORT_SETTINGS.lastAt?('마지막 자동보고: '+REPORT_SETTINGS.lastAt):'아직 자동보고 없음'}</div>
-      </div>
-      <div class="lbl" style="margin-top:2px">팀원 현황</div>
-      <div id="memberlist" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
-      <div class="card">
-        <div class="lbl">팀원 추가</div>
-        <input id="nm_name" placeholder="이름" style="margin-bottom:8px">
-        <select id="nm_role" style="margin-bottom:8px">${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
-        <button class="btn btn-ghost" style="padding:9px" onclick="addMember()">+ 팀원 추가</button>
-      </div>
-      <div class="lbl" style="margin-top:14px">기체 현황</div>
-      <div id="dronelist" style="display:flex;flex-direction:column;gap:10px">${drones.length?'':'<div class="card muted">배정된 기체가 없습니다.</div>'}</div>
-      <div class="card" style="margin-top:4px">
-        <div class="lbl">신규 기체 등록</div>
-        <input id="nd_code" placeholder="호수 (예: 1호수)" style="margin-bottom:8px">
-        <select id="nd_model" style="margin-bottom:8px">${modelOptions()}</select>
-        <button class="btn btn-ghost" style="padding:10px" onclick="createDrone()">+ 기체 추가</button>
       </div>`;
-    renderMemberList(members);
-    document.getElementById('dronelist').innerHTML = drones.map(function(dr){ return droneCard(dr); }).join('');
     document.querySelectorAll('#rs_mode button').forEach(function(b){
       b.onclick=function(){
         document.querySelectorAll('#rs_mode button').forEach(function(x){x.classList.remove('on');});
@@ -665,7 +679,18 @@ async function renderDrones(){
         document.getElementById('rs_dist_wrap').style.display = b.dataset.m==='distance' ? 'block' : 'none';
       };
     });
-  }catch(e){ v.innerHTML=err(e); }
+  }else{
+    el.innerHTML = `
+      <div class="lbl" style="margin-top:2px">팀원 현황</div>
+      <div id="memberlist" style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px"></div>
+      <div class="card">
+        <div class="lbl">팀원 추가</div>
+        <input id="nm_name" placeholder="이름" style="margin-bottom:8px">
+        <select id="nm_role" style="margin-bottom:8px">${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
+        <button class="btn btn-ghost" style="padding:9px" onclick="addMember()">+ 팀원 추가</button>
+      </div>`;
+    renderMemberList(members);
+  }
 }
 function modelOptions(selId){
   const groups={attack:[],recon:[]};
@@ -947,7 +972,17 @@ function applyManualMGRS_r(){
   if(R_PICKER) R_PICKER.place(ll[0],ll[1]);
 }
 function numRow(id,label){return `<div class="between" style="padding:7px 0"><span>${label}</span>
-  <input id="${id}" type="number" inputmode="numeric" style="width:90px;text-align:right" value="0" onfocus="this.select()"></div>`;}
+  <div style="display:flex;align-items:center;gap:6px">
+    <button type="button" class="stepper-btn" onclick="stepNum('${id}',-1)">−</button>
+    <input id="${id}" type="number" inputmode="numeric" min="0" style="width:52px;text-align:center;padding:8px 2px" value="0" onfocus="this.select()">
+    <button type="button" class="stepper-btn" onclick="stepNum('${id}',1)">+</button>
+  </div></div>`;}
+function stepNum(id, delta){
+  const el=document.getElementById(id);
+  if(!el) return;
+  const cur=+el.value||0;
+  el.value=Math.max(0, cur+delta);
+}
 const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병']];
 function reconTargetSummary(r){
   const parts=RECON_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
@@ -991,8 +1026,18 @@ function rfields(){
 async function submitReport(){
   const g=id=>{const e=document.getElementById(id);return e?e.value:null;};
   const rla=g('r_lat'), rln=g('r_lng');
+  if(!rla || !rln){
+    toast('⚠ 좌표를 입력하세요 — 지도를 탭하거나 군사좌표를 입력해 주세요');
+    const mapEl=document.getElementById('r_map');
+    if(mapEl){
+      mapEl.classList.add('pulse-highlight');
+      mapEl.scrollIntoView({behavior:'smooth', block:'center'});
+      setTimeout(function(){ mapEl.classList.remove('pulse-highlight'); }, 2200);
+    }
+    return;
+  }
   const body={team_id:SESS.team_id,kind:RKIND,mode:MODE};
-  if(rla&&rln){ body.lat=+rla; body.lng=+rln; body.coord=toMGRS(+rla,+rln)||''; }
+  body.lat=+rla; body.lng=+rln; body.coord=toMGRS(+rla,+rln)||'';
   if(RKIND==='recon'){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('r_'+l[0]); if(v>0) body[l[0]]=v; });
     body.hostile=document.getElementById('r_hostile').checked?1:0;
@@ -1070,7 +1115,11 @@ function reportCardHtml(r){
   </div>`;
 }
 function numRowEdit(id,label,val){return `<div class="between" style="padding:5px 0"><span style="font-size:12.5px">${label}</span>
-  <input id="${id}" type="number" inputmode="numeric" style="width:80px;text-align:right" value="${val}" onfocus="this.select()"></div>`;}
+  <div style="display:flex;align-items:center;gap:5px">
+    <button type="button" class="stepper-btn" style="width:28px;height:28px;font-size:15px" onclick="stepNum('${id}',-1)">−</button>
+    <input id="${id}" type="number" inputmode="numeric" style="width:46px;text-align:center;padding:6px 2px" value="${val}" onfocus="this.select()">
+    <button type="button" class="stepper-btn" style="width:28px;height:28px;font-size:15px" onclick="stepNum('${id}',1)">+</button>
+  </div></div>`;}
 function toggleReportEdit(id){
   const el=document.getElementById('redit_'+id);
   if(!el) return;
