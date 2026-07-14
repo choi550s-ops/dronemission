@@ -1186,9 +1186,11 @@ async function loadDash(){
     document.getElementById('teams').innerHTML=(d.teams||[]).map(t=>{
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
       const coordTip=esc(teamCoordText(t.lat,t.lng));
+      const unread = +(t.unread_messages||0);
+      const unreadBadge = unread>0 ? `<span class="chip" style="background:rgba(226,74,59,.18);color:#ff8579;margin-left:2px;padding:1px 6px;font-size:10px">${unread}</span>` : '';
       return `<tr onclick="flashTeam(${t.id})" title="좌표: ${coordTip}">
         <td class="mono" data-label="팀" style="color:${teamColorForNo(t.team_no)};font-weight:700">
-          <button class="expand-arrow" onclick="event.stopPropagation();openTeamDrawer(${t.id})" title="팀 상세관리">▶</button><button class="expand-arrow" onclick="event.stopPropagation();openMessageModal(${t.id},'${esc(t.team_no)}')" title="메시지 보내기">💬</button>${esc(t.team_no)}팀</td>
+          <button class="expand-arrow" onclick="event.stopPropagation();openTeamDrawer(${t.id})" title="팀 상세관리">▶</button><button class="expand-arrow" onclick="event.stopPropagation();openMessageModal(${t.id},'${esc(t.team_no)}')" title="메시지 보내기">💬</button>${unreadBadge}${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
         <td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
     if(TD_TEAM_ID!=null) loadTeamDrawer(TD_TEAM_ID);
@@ -1485,7 +1487,7 @@ function openMessageModal(teamId, teamNo){
   document.getElementById('msg_modal_title').textContent=teamNo+'팀에게 메시지';
   document.getElementById('msg_body').value='';
   openModalEl('modal_message');
-  loadMessageHistory(teamId);
+  loadMessageHistory(teamId).then(function(){ loadDash(); });
 }
 async function loadMessageHistory(teamId){
   const el=document.getElementById('msg_history');

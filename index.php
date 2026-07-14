@@ -123,7 +123,8 @@ function route($path, $method)
         Auth::require_auth();
         $teams = $pdo->query(
             "SELECT t.id, t.team_no, t.name, t.status, t.coord, t.lat, t.lng, t.last_login_at,
-                    (SELECT COUNT(*) FROM iuccs_drones d WHERE d.team_id = t.id) AS drone_count
+                    (SELECT COUNT(*) FROM iuccs_drones d WHERE d.team_id = t.id) AS drone_count,
+                    (SELECT COUNT(*) FROM iuccs_messages m WHERE m.team_id = t.id AND m.direction = 'from_team' AND m.read_at IS NULL) AS unread_messages
                FROM iuccs_teams t ORDER BY t.team_no"
         )->fetchAll();
         $counts = array(
