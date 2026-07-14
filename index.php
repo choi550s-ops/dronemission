@@ -607,8 +607,8 @@ function route($path, $method)
         $st  = $pdo->prepare(
             "INSERT INTO iuccs_reports
                 (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery,
-                 armed, unarmed, scale, kia, serious, minor, failed, note, hostile)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                 armed, unarmed, scale, kia, serious, minor, destroyed, heavy_damage, light_damage, failed, note, hostile)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'mission_id'), pval($b, 'team_id', $s['team_id']), $kind,
@@ -618,6 +618,7 @@ function route($path, $method)
             pval($b, 'tanks'), pval($b, 'armored'), pval($b, 'artillery'),
             pval($b, 'armed'), pval($b, 'unarmed'), pval($b, 'scale'),
             pval($b, 'kia'), pval($b, 'serious'), pval($b, 'minor'),
+            pval($b, 'destroyed'), pval($b, 'heavy_damage'), pval($b, 'light_damage'),
             pval($b, 'failed') ? 1 : 0, pval($b, 'note'), pval($b, 'hostile') ? 1 : 0,
         ));
         $id = $pdo->lastInsertId();
@@ -637,7 +638,7 @@ function route($path, $method)
         }
         $fields = array(
             'troops', 'trucks', 'vehicles', 'tanks', 'armored', 'artillery', 'hostile',
-            'armed', 'unarmed', 'kia', 'serious', 'minor', 'failed', 'note',
+            'armed', 'unarmed', 'kia', 'serious', 'minor', 'destroyed', 'heavy_damage', 'light_damage', 'failed', 'note',
         );
         $sets = array(); $vals = array();
         foreach ($fields as $f) {

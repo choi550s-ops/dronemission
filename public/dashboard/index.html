@@ -519,6 +519,11 @@ function reconTargetSummary(r){
   const parts=RECON_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
   return parts.length ? parts.join(' · ') : '식별된 표적 없음';
 }
+const DAMAGE_FIELD_LABELS=[['kia','사망'],['serious','중상'],['minor','경상'],['destroyed','완파'],['heavy_damage','중파'],['light_damage','소파']];
+function damageSummary(r){
+  const parts=DAMAGE_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
+  return parts.length ? parts.join(' · ') : '확인된 피해 없음';
+}
 
 // ---- per-team color ----
 const TEAMPAL=['#56B4E9','#E69F00','#009E73','#CC79A7','#D55E00','#0072B2','#B0BEC5','#F0E442'];
@@ -1295,7 +1300,7 @@ async function loadReports(){
       let c;
       if(r.kind==='recon') c=`${reconTargetSummary(r)}${r.hostile==1?' · 🔺적식별':''}`;
       else if(r.kind==='attack') c=`무장 ${r.armed??0}·비무장 ${r.unarmed??0}`;
-      else if(r.kind==='damage') c=`사망 ${r.kia??0}·중상 ${r.serious??0}·경상 ${r.minor??0}${r.failed==1?' · 임무실패':''}`;
+      else if(r.kind==='damage') c=damageSummary(r);
       else c=esc(r.note||'');
       const teamNo=TEAMNO[r.team_id]||r.team_id;
       const coordStr=coordText(r.lat,r.lng,r.coord);
@@ -1336,9 +1341,7 @@ function openReportEditModal(id){
     body.innerHTML = ['armed','unarmed'].map(function(k){ return numRowEditD('re_'+k, lbls[k], r[k]||0); }).join('')
       + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'attack')">저장</button>`;
   } else {
-    const lbls={kia:'사망',serious:'중상',minor:'경상'};
-    body.innerHTML = ['kia','serious','minor'].map(function(k){ return numRowEditD('re_'+k, lbls[k], r[k]||0); }).join('')
-      + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_failed" ${r.failed==1?'checked':''} style="width:18px;height:18px;flex:none"> 임무 실패</label>`
+    body.innerHTML = DAMAGE_FIELD_LABELS.map(function(l){ return numRowEditD('re_'+l[0], l[1], r[l[0]]||0); }).join('')
       + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'damage')">저장</button>`;
   }
   openModalEl('modal_report_edit');
@@ -1354,8 +1357,7 @@ async function saveReportEditD(id, kind){
   }else if(kind==='attack'){
     ['armed','unarmed'].forEach(function(k){ body[k]=+g('re_'+k); });
   }else{
-    ['kia','serious','minor'].forEach(function(k){ body[k]=+g('re_'+k); });
-    body.failed=document.getElementById('re_failed').checked?1:0;
+    DAMAGE_FIELD_LABELS.forEach(function(l){ body[l[0]]=+g('re_'+l[0]); });
   }
   try{
     await api('/reports/update','POST',body);
