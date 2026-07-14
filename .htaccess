@@ -23,3 +23,17 @@ Options -Indexes
 <FilesMatch "^\.env$|\.sql$|composer\.(json|lock)$|\.md$|\.gitignore$|\.ya?ml$">
     Require all denied
 </FilesMatch>
+
+# The two apps are static index.html files served directly (matched above by
+# "REQUEST_FILENAME !-f" falling through). Force browsers/mobile carriers to
+# always revalidate instead of serving a stale cached copy after a deploy —
+# without this, phones in particular can keep showing an old version for a
+# long time even after the server has the fix.
+<IfModule mod_headers.c>
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+        Header set Pragma "no-cache"
+        Header set Expires "0"
+    </FilesMatch>
+</IfModule>
+
