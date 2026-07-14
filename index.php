@@ -488,12 +488,12 @@ function route($path, $method)
         $route = trim((string) pval($b, 'route', ''));
         if ($route === '') { $route = '자율'; }
         $st = $pdo->prepare(
-            "INSERT INTO iuccs_missions(team_id, type, coord, lat, lng, route, method, mode, status, issued_by, route_points, target)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+            "INSERT INTO iuccs_missions(team_id, type, coord, lat, lng, route, method, mode, status, issued_by, route_points, target, source_report_id)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'team_id', $s['team_id']), $type, pval($b, 'coord'), pval($b, 'lat'), pval($b, 'lng'),
-            $route, pval($b, 'method'), $mode, $status, $s['user_id'], $rp, pval($b, 'target'),
+            $route, pval($b, 'method'), $mode, $status, $s['user_id'], $rp, pval($b, 'target'), pval($b, 'source_report_id'),
         ));
         $id = $pdo->lastInsertId();
         log_activity('user#' . $s['user_id'], 'mission_issue', 'mission', $id, $type);

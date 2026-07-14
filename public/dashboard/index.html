@@ -925,6 +925,7 @@ function clearRoute(){
   if(BASELINE){ LG.route.removeLayer(BASELINE); BASELINE=null; }
   if(MLINE){ MLINE.setLatLngs([]); MLINE.unbindTooltip(); }
   const el=document.getElementById('m_coords'); if(el) el.innerHTML='<span class="muted">‘경로 그리기’를 켜고 좌측 COP 지도를 클릭하세요</span>';
+  PENDING_SOURCE_REPORT_ID=null;
 }
 
 // ---- team detail drawer (roster + drone management, big right-side panel) ----
@@ -1400,7 +1401,7 @@ function fireFromReportBtn(r, coordStr){
 }
 function damageFromReportBtn(r){
   const latArg = r.lat==null?'null':+r.lat, lngArg = r.lng==null?'null':+r.lng;
-  return ` <button class="btn btn-ghost" style="padding:4px 7px;font-size:10px" onclick="prefillDamageTarget(${latArg},${lngArg})">🎯 피해평가</button>`;
+  return ` <button class="btn btn-ghost" style="padding:4px 7px;font-size:10px" onclick="prefillDamageTarget(${latArg},${lngArg},${r.id})">🎯 피해평가</button>`;
 }
 function hostileActionCell(r, coordStr){
   const at=r.action_taken||'none';
@@ -1430,7 +1431,7 @@ function hostileActionCell(r, coordStr){
 async function reportAction(id, action, lat, lng, coord, targetInfo){
   try{
     await api('/reports/action','POST',{id,action});
-    if(action==='attack'){ prefillAttackTarget(lat,lng,coord,targetInfo); }
+    if(action==='attack'){ prefillAttackTarget(lat,lng,coord,targetInfo,id); }
     loadReports(); loadDash(); loadBoard(); loadMap();
   }catch(e){ toast('처리 실패'); }
 }
@@ -1603,23 +1604,26 @@ function closeModalEl(id){ const el=document.getElementById(id); if(el) el.style
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'){ ['modal_board','modal_reports','modal_fires','modal_message','modal_report_edit'].forEach(closeModalEl); closeTeamDrawer(); }
 });
-function prefillAttackTarget(lat, lng, coord, targetInfo){
+let PENDING_SOURCE_REPORT_ID=null;
+function prefillAttackTarget(lat, lng, coord, targetInfo, sourceReportId){
   const typeSel=document.getElementById('m_type');
   typeSel.value='attack'; onTypeChange();
   if(targetInfo){ document.getElementById('m_target').value=targetInfo; }
   ROUTE = (lat!=null && lng!=null && !isNaN(lat) && !isNaN(lng)) ? [[+lat,+lng]] : [];
   redrawRoute();
+  PENDING_SOURCE_REPORT_ID = sourceReportId!=null ? sourceReportId : null;
   const sel=document.getElementById('m_team');
   sel.focus();
   sel.classList.add('pulse-highlight');
   sel.addEventListener('change', function stopBlink(){ sel.classList.remove('pulse-highlight'); }, {once:true});
   toast('🎯 공격 임무 대상 지정됨(표적정보 반영) — 팀을 선택하고 "임무 하달"을 누르세요');
 }
-function prefillDamageTarget(lat, lng){
+function prefillDamageTarget(lat, lng, sourceReportId){
   const typeSel=document.getElementById('m_type');
   typeSel.value='damage'; onTypeChange();
   ROUTE = (lat!=null && lng!=null && !isNaN(lat) && !isNaN(lng)) ? [[+lat,+lng]] : [];
   redrawRoute();
+  PENDING_SOURCE_REPORT_ID = sourceReportId!=null ? sourceReportId : null;
   const sel=document.getElementById('m_team');
   sel.focus();
   sel.classList.add('pulse-highlight');
@@ -1632,6 +1636,7 @@ async function issueMission(){
     route:document.getElementById('m_route').value};
   if(body.type==='attack'){ body.method='designated'; body.target=document.getElementById('m_target').value; }
   else if(body.type==='damage'){ body.method='designated'; }
+  if(PENDING_SOURCE_REPORT_ID!=null){ body.source_report_id=PENDING_SOURCE_REPORT_ID; }
   if(ROUTE.length){ body.route_points=ROUTE; body.lat=ROUTE[0][0]; body.lng=ROUTE[0][1];
     body.coord=toMGRS(ROUTE[0][0],ROUTE[0][1])||''; }
   try{ const r=await api('/missions','POST',body);

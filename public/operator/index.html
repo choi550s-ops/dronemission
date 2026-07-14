@@ -393,6 +393,18 @@ document.querySelectorAll('#tabs .tab').forEach(t=>t.onclick=()=>{
   document.querySelectorAll('#tabs .tab').forEach(x=>x.classList.remove('on'));
   t.classList.add('on'); go(t.dataset.v);});
 function go(v){({home:renderHome,missions:renderMissions,drones:renderDrones,report:renderReport,alerts:renderChat}[v])();}
+let REPORT_CONTEXT=null;
+function goToResultReport(missionId, missionType, lat, lng){
+  REPORT_CONTEXT = {missionId:missionId, type:missionType, lat:lat, lng:lng};
+  document.querySelectorAll('#tabs .tab').forEach(function(t){ t.classList.remove('on'); });
+  const target=document.querySelector('#tabs .tab[data-v="report"]');
+  if(target) target.classList.add('on');
+  go('report');
+}
+function clearReportContext(){
+  REPORT_CONTEXT=null;
+  renderReport();
+}
 function doLogout(){
   if(!confirm('로그아웃 하시겠습니까?')) return;
   api('/logout','POST').catch(()=>{});
@@ -887,6 +899,10 @@ async function renderMissions(){
       if(pts&&pts.length) routes[m.id]=pts;
       const gate=atk&&!(m.approved==1)?`<div class="warn" style="margin:9px 0">⚠ 지휘관 승인·교전규칙(ROE) 확인 후 수행 가능</div>`:'';
       const respBlock=respWidget(m);
+      const canResultReport = m.response_type==='ack' && m.status!=='cancelled';
+      const resultReportBlock = canResultReport
+        ? `<button class="btn btn-ghost" style="padding:9px;font-size:12.5px;width:100%;margin-top:9px" onclick="goToResultReport(${m.id},'${m.type}',${m.lat==null?'null':+m.lat},${m.lng==null?'null':+m.lng})">📋 결과보고</button>`
+        : '';
       const completeBlock=completeWidget(m);
       const statusChip = m.status==='completed'
         ? '<span class="chip" style="background:rgba(47,163,90,.16);color:#6fe0a0">✔ 임무완료</span>'
@@ -904,7 +920,7 @@ async function renderMissions(){
           ${statusChip}</div>
         <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">위치</span><span class="mono" style="color:#CFE0F0">${esc(coordText(m.lat,m.lng,m.coord))}</span></div>
         <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${singlePoint?'방식':'경로'}</span><span class="val" style="font-size:13px">${esc(singlePoint?(m.method||'표적지정'):(m.route||'-'))}</span></div>
-        ${mapBlock}${gate}${respBlock}${completeBlock}</div>`;}).join('');
+        ${mapBlock}${gate}${respBlock}${resultReportBlock}${completeBlock}</div>`;}).join('');
     Object.keys(routes).forEach(function(id){ mountRouteMap('mmap_'+id, routes[id]); });
   }catch(e){ v.innerHTML=err(e); }
 }
@@ -930,9 +946,20 @@ let RKIND='recon';
 let R_PICKER=null;
 function renderReport(){
   const v=document.getElementById('view');
+  const ctx=REPORT_CONTEXT;
+  const ctxKind = ctx ? ctx.type : 'recon';
+  const ctxBanner = ctx ? `<div class="card" style="border-color:rgba(232,163,61,.5);margin-bottom:10px">
+      <div class="between"><span style="font-size:12.5px;color:var(--amber)">📎 임무 #${ctx.missionId}에 대한 결과보고입니다</span>
+      <button class="btn btn-ghost" style="padding:3px 9px;font-size:10.5px" onclick="clearReportContext()">연결 해제</button></div>
+    </div>` : '';
   v.innerHTML=`
     <h2>결과 보고</h2>
-    <div class="seg" id="rkind"><button data-k="recon" class="on">정찰</button><button data-k="attack">공격</button><button data-k="damage">피해평가</button></div>
+    ${ctxBanner}
+    <div class="seg" id="rkind">
+      <button data-k="recon" class="${ctxKind==='recon'?'on':''}">정찰</button>
+      <button data-k="attack" class="${ctxKind==='attack'?'on':''}">공격</button>
+      <button data-k="damage" class="${ctxKind==='damage'?'on':''}">피해평가</button>
+    </div>
     <div class="card">
       <div class="lbl">식별 위치 — 지도를 탭하세요</div>
       <div id="r_map" class="pickmap"></div>
@@ -952,6 +979,7 @@ function renderReport(){
     <button class="btn btn-amber" onclick="submitReport()">✔ 보고 전송</button>
     <h2 style="margin-top:16px">내 보고 목록</h2>
     <div id="my_reports"></div>`;
+  RKIND=ctxKind;
   document.querySelectorAll('#rkind button').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#rkind button').forEach(x=>x.classList.remove('on'));b.classList.add('on');RKIND=b.dataset.k;rfields();});
   rfields();
@@ -960,6 +988,12 @@ function renderReport(){
     document.getElementById('r_lng').value=ln.toFixed(6);
     fillMgrsBoxes(la,ln,'r_mgrs');
   });
+  if(ctx && ctx.lat!=null && ctx.lng!=null){
+    document.getElementById('r_lat').value=(+ctx.lat).toFixed(6);
+    document.getElementById('r_lng').value=(+ctx.lng).toFixed(6);
+    fillMgrsBoxes(+ctx.lat,+ctx.lng,'r_mgrs');
+    setTimeout(function(){ if(R_PICKER) R_PICKER.place(+ctx.lat,+ctx.lng); },300);
+  }
   loadMyReports();
 }
 function applyManualMGRS_r(){
@@ -1038,6 +1072,7 @@ async function submitReport(){
   }
   const body={team_id:SESS.team_id,kind:RKIND,mode:MODE};
   body.lat=+rla; body.lng=+rln; body.coord=toMGRS(+rla,+rln)||'';
+  if(REPORT_CONTEXT && REPORT_CONTEXT.missionId!=null){ body.mission_id=REPORT_CONTEXT.missionId; }
   if(RKIND==='recon'){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('r_'+l[0]); if(v>0) body[l[0]]=v; });
     body.hostile=document.getElementById('r_hostile').checked?1:0;
@@ -1050,7 +1085,7 @@ async function submitReport(){
   else{
     ['kia','serious','minor','destroyed','heavy_damage','light_damage'].forEach(function(k){ const v=+g('r_'+k); if(v>0) body[k]=v; });
   }
-  try{ await api('/reports','POST',body); toast('보고 전송됨'); renderReport(); }catch(e){ toast('전송 실패'); }
+  try{ await api('/reports','POST',body); toast('보고 전송됨'); REPORT_CONTEXT=null; renderReport(); }catch(e){ toast('전송 실패'); }
 }
 async function loadMyReports(){
   const el=document.getElementById('my_reports');
