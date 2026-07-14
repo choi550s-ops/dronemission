@@ -94,7 +94,7 @@
   .team-inmap-head{padding:13px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex:none}
   .team-inmap-body{padding:15px 18px;overflow-y:auto;flex:1;min-height:0}
   .td-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
-  .td-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .td-list{display:flex;flex-direction:column;gap:6px;margin-bottom:10px;max-height:320px;overflow-y:auto;padding-right:2px}
   .modal-overlay{position:fixed;inset:0;background:rgba(4,9,17,.72);z-index:70;display:flex;align-items:center;justify-content:center;padding:24px}
   .modal-box{background:var(--surface);border:1px solid var(--line);border-radius:14px;width:min(1200px,95vw);max-height:88vh;
     display:flex;flex-direction:column;overflow:hidden;box-shadow:0 30px 60px -20px rgba(0,0,0,.6)}
@@ -668,8 +668,8 @@ async function loadBoard(){
       return ms.length ? ms.map(function(m){ return boardRowHtml(m,suffix); }).join('')
         : '<tr><td colspan="10" class="muted">표시할 임무가 없습니다.</td></tr>';
     };
-    const bEl=document.getElementById('board'); if(bEl && !isTypingInside('board')) bEl.innerHTML=build(all.slice(0,20),'');
-    const bmEl=document.getElementById('board_modal'); if(bmEl && !isTypingInside('board_modal')) bmEl.innerHTML=build(all,'_modal');
+    const bEl=document.getElementById('board'); if(bEl && !isTypingInside('board')) setHtmlIfChanged(bEl, build(all.slice(0,20),''));
+    const bmEl=document.getElementById('board_modal'); if(bmEl && !isTypingInside('board_modal')) setHtmlIfChanged(bmEl, build(all,'_modal'));
   }catch(e){}
 }
 
@@ -1030,7 +1030,7 @@ function modelOptionsD(selId){
 }
 async function loadTeamDrawer(id){
   const body=document.getElementById('td_body');
-  body.innerHTML='<div class="muted" style="font-size:12px">불러오는 중…</div>';
+  if(!body.__loadedOnce || body.__loadedTeamId!==id){ body.innerHTML='<div class="muted" style="font-size:12px">불러오는 중…</div>'; body.__lastHtml=undefined; }
   try{
     const [dm, mm, dd] = await Promise.all([
       DRONE_MODELS_D.length?Promise.resolve({models:DRONE_MODELS_D}):api('/drone-models'),
@@ -1043,7 +1043,7 @@ async function loadTeamDrawer(id){
     const team=LAST_TEAMS.find(function(t){return t.id===id;})||{};
     const s=STATUS[team.status]||[team.status,'var(--muted)'];
     document.getElementById('td_title').innerHTML = `<span style="color:${teamColorForNo(team.team_no)}">${esc(team.team_no)}팀</span> 상세관리`;
-    body.innerHTML = `
+    const skeletonHtml = `
       <div style="margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:10px">
         <div class="between" style="margin-bottom:8px">
           <span style="font-size:12.5px"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</span>
@@ -1077,10 +1077,13 @@ async function loadTeamDrawer(id){
           </div>
         </div>
       </div>`;
+    setHtmlIfChanged(body, skeletonHtml);
+    body.__loadedOnce=true; body.__loadedTeamId=id;
     renderMemberListD(members, id);
-    document.getElementById('td_drones').innerHTML = drones.length ? drones.map(function(dr){ return droneCardD(dr); }).join('') : '<div class="muted" style="font-size:12px">등록된 기체가 없습니다.</div>';
+    const dronesHtml = drones.length ? drones.map(function(dr){ return droneCardD(dr); }).join('') : '<div class="muted" style="font-size:12px">등록된 기체가 없습니다.</div>';
+    setHtmlIfChanged(document.getElementById('td_drones'), dronesHtml);
     renderTeamStatusSelD(id, team.status);
-  }catch(e){ body.innerHTML='<div class="muted" style="font-size:12px">불러오기 실패</div>'; }
+  }catch(e){ body.innerHTML='<div class="muted" style="font-size:12px">불러오기 실패</div>'; body.__lastHtml=undefined; }
 }
 const TEAM_STATUS_OPTS_D=[
   {k:'unavailable', label:'운용불가', color:'#E24A3B'},
@@ -1091,11 +1094,12 @@ const TEAM_STATUS_OPTS_D=[
 function renderTeamStatusSelD(teamId, current){
   const el=document.getElementById('td_status_sel');
   if(!el) return;
-  el.innerHTML = TEAM_STATUS_OPTS_D.map(function(o){
+  const html = TEAM_STATUS_OPTS_D.map(function(o){
     const active = o.k===current;
     return `<button style="flex:1;border:1.5px solid ${o.color};background:${active?o.color:'transparent'};color:${active?'#0c1420':o.color};
       font-weight:800;font-size:10.5px;padding:7px 2px;border-radius:7px;cursor:pointer;font-family:inherit" onclick="setTeamStatusD(${teamId},'${o.k}')">${o.label}</button>`;
   }).join('');
+  setHtmlIfChanged(el, html);
 }
 async function setTeamStatusD(teamId, status){
   try{ await api('/teams/status','POST',{team_id:teamId, status}); toast('팀 상태 변경됨'); loadTeamDrawer(teamId); loadDash(); loadMap(); }
@@ -1103,7 +1107,7 @@ async function setTeamStatusD(teamId, status){
 }
 function renderMemberListD(members, tid){
   const el=document.getElementById('td_members'); if(!el) return;
-  el.innerHTML = members.length ? members.map(function(m){
+  const html = members.length ? members.map(function(m){
     if(EDITING_MEMBER_D===m.id){
       return `<div class="card" style="padding:9px 10px">
         <input id="dedit_name_${m.id}" value="${esc(m.name)}" style="margin-bottom:6px">
@@ -1120,6 +1124,7 @@ function renderMemberListD(members, tid){
         <button class="btn btn-ghost" style="padding:3px 8px;font-size:10.5px" onclick="deleteMemberD(${m.id},${tid})">삭제</button>
       </span></div>`;
   }).join('') : '<div class="muted" style="font-size:11.5px">등록된 팀원이 없습니다.</div>';
+  setHtmlIfChanged(el, html);
 }
 function startEditMemberD(mid,tid){ EDITING_MEMBER_D=mid; loadTeamDrawer(tid); }
 function cancelEditMemberD(tid){ EDITING_MEMBER_D=null; loadTeamDrawer(tid); }
@@ -1200,6 +1205,13 @@ function isTypingInside(containerId){
   if(!el.contains(active)) return false;
   return active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT';
 }
+function setHtmlIfChanged(el, html){
+  if(!el) return false;
+  if(el.__lastHtml===html) return false;
+  el.innerHTML=html;
+  el.__lastHtml=html;
+  return true;
+}
 async function loadDash(){
   try{
     const d=await api('/dashboard');
@@ -1209,7 +1221,7 @@ async function loadDash(){
       <div class="ministat"><span class="n">${d.counts.missions_pending}</span><span class="l">대기 임무</span></div>
       <div class="ministat"><span class="n">${d.counts.reports_unack}</span><span class="l">미확인 보고</span></div>
       <div class="ministat"><span class="n">${d.counts.fire_pending}</span><span class="l">화력요청 대기</span></div>`;
-    document.getElementById('teams').innerHTML=(d.teams||[]).map(t=>{
+    const teamsHtml=(d.teams||[]).map(t=>{
       const s=STATUS[t.status]||[t.status,'var(--muted)'];
       const coordTip=esc(teamCoordText(t.lat,t.lng));
       const unread = +(t.unread_messages||0);
@@ -1219,6 +1231,7 @@ async function loadDash(){
           <button class="expand-arrow" onclick="event.stopPropagation();openTeamDrawer(${t.id})" title="팀 상세관리">▶</button><button class="expand-arrow" onclick="event.stopPropagation();openMessageModal(${t.id},'${esc(t.team_no)}')" title="메시지 보내기">💬</button>${unreadBadge}${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
         <td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
+    setHtmlIfChanged(document.getElementById('teams'), teamsHtml);
     if(TD_TEAM_ID!=null && !isTypingInside('teamPanel')) loadTeamDrawer(TD_TEAM_ID);
     const sel=document.getElementById('m_team');
     if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; redrawRoute(); }
@@ -1276,8 +1289,8 @@ async function loadFires(){
       SEEN_MAX_FIRE=Math.max(SEEN_MAX_FIRE,maxId);
     }
     const build=function(list,suffix){ return list.length?list.map(function(f){return fireCardHtml(f,suffix);}).join(''):'<div class="muted" style="font-size:12.5px">요청 없음</div>'; };
-    const fEl=document.getElementById('fires'); if(fEl) fEl.innerHTML=build(arr.slice(0,8),'');
-    const fmEl=document.getElementById('fires_modal'); if(fmEl) fmEl.innerHTML=build(arr,'_modal');
+    const fEl=document.getElementById('fires'); if(fEl) setHtmlIfChanged(fEl, build(arr.slice(0,8),''));
+    const fmEl=document.getElementById('fires_modal'); if(fmEl) setHtmlIfChanged(fmEl, build(arr,'_modal'));
   }catch(e){}
 }
 function showDecideForm(id,suffix){
@@ -1345,8 +1358,8 @@ async function loadReports(){
         <td data-label="내용" style="font-size:12px">${esc(c)}</td>
         <td data-label="조치">${actionCell}${fireBtn}${damageBtn}${editBtn}${delBtn}</td></tr>`;}).join('')
       :'<tr><td colspan="9" class="muted">보고 없음</td></tr>';
-    const rEl=document.getElementById('reports'); if(rEl && !isTypingInside('reports')) rEl.innerHTML=html;
-    const rmEl=document.getElementById('reports_modal'); if(rmEl && !isTypingInside('reports_modal')) rmEl.innerHTML=html;
+    const rEl=document.getElementById('reports'); if(rEl && !isTypingInside('reports')) setHtmlIfChanged(rEl, html);
+    const rmEl=document.getElementById('reports_modal'); if(rmEl && !isTypingInside('reports_modal')) setHtmlIfChanged(rmEl, html);
   }catch(e){}
 }
 function openReportEditModal(id){
