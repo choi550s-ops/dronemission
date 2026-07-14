@@ -619,7 +619,7 @@ function route($path, $method)
             (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real', pval($b, 'coord'),
             pval($b, 'lat'), pval($b, 'lng'),
             pval($b, 'troops'), pval($b, 'trucks'), pval($b, 'vehicles'),
-            pval($b, 'tanks'), pval($b, 'armored'), pval($b, 'artillery'), pval($b, 'unidentified'),
+            pval($b, 'tanks'), pval($b, 'armored'), pval($b, 'artillery'), pval($b, 'unidentified') ? 1 : 0,
             pval($b, 'armed'), pval($b, 'unarmed'), pval($b, 'scale'),
             pval($b, 'kia'), pval($b, 'serious'), pval($b, 'minor'),
             pval($b, 'destroyed'), pval($b, 'heavy_damage'), pval($b, 'light_damage'),
@@ -652,7 +652,7 @@ function route($path, $method)
             if (!array_key_exists($f, $b)) { continue; }
             if (isset($enum[$f]) && !in_array($b[$f], $enum[$f], true)) { continue; }
             $sets[] = "$f = ?";
-            $vals[] = ($f === 'hostile' || $f === 'failed') ? (pval($b, $f) ? 1 : 0) : pval($b, $f);
+            $vals[] = in_array($f, array('hostile', 'failed', 'unidentified'), true) ? (pval($b, $f) ? 1 : 0) : pval($b, $f);
         }
         if (!$sets) { json_out(array('error' => 'no_fields'), 400); }
         $vals[] = $id;

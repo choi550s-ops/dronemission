@@ -516,11 +516,12 @@ function toMGRS(lat,lng){
 }
 function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
 function teamCoordText(lat,lng){ const m=toMGRS(lat,lng); return m||'GPS 위치 없음'; }
-const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병'],['unidentified','미식별']];
+const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병']];
 const KIND_LABELS_D={recon:'정찰',attack:'공격',damage:'피해평가',photo:'사진'};
 const MTYPE_LABELS_D={recon:'정찰',attack:'공격',damage:'피해평가'};
 const MTYPE_BADGE_D={recon:'rgba(59,130,214,.18);color:#8fc0ff',attack:'rgba(226,74,59,.18);color:#ff8579',damage:'rgba(232,163,61,.18);color:#F3C070'};
 function reconTargetSummary(r){
+  if(r.unidentified==1) return '❓ 미식별 (식별된 것 없음)';
   const parts=RECON_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
   return parts.length ? parts.join(' · ') : '식별된 표적 없음';
 }
@@ -1347,7 +1348,8 @@ function openReportEditModal(id){
   const body=document.getElementById('report_edit_body');
   if(r.kind==='recon'){
     body.innerHTML = `<div class="numgrid">${RECON_FIELD_LABELS.map(function(l){ return numCellD('re_'+l[0], l[1], r[l[0]]||0); }).join('')}</div>`
-      + `<label class="row" style="margin-top:10px;font-size:13px"><input type="checkbox" id="re_hostile" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`
+      + `<label class="row" style="margin-top:10px;font-size:13px"><input type="checkbox" id="re_unidentified" ${r.unidentified==1?'checked':''} style="width:18px;height:18px;flex:none"> ❓ 미식별</label>`
+      + `<label class="row" style="margin-top:6px;font-size:13px"><input type="checkbox" id="re_hostile" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`
       + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'recon')">저장</button>`;
   } else if(r.kind==='attack'){
     body.innerHTML = attackResultEditHtmlD(r)
@@ -1384,6 +1386,7 @@ async function saveReportEditD(id, kind){
   if(kind==='recon'){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('re_'+l[0]); body[l[0]]=v>0?v:null; });
     body.hostile=document.getElementById('re_hostile').checked?1:0;
+    body.unidentified=document.getElementById('re_unidentified').checked?1:0;
   }else if(kind==='attack'){
     const seg=document.getElementById('re_attack_result_seg');
     const activeBtn=seg?seg.querySelector('button.on'):null;

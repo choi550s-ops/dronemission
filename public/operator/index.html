@@ -1028,8 +1028,22 @@ function stepNum(id, delta){
   const cur=+el.value||0;
   el.value=Math.max(0, cur+delta);
 }
-const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병'],['unidentified','미식별']];
+function onUnidentifiedToggle(){
+  const checked=document.getElementById('r_unidentified').checked;
+  const grid=document.getElementById('r_numgrid');
+  if(grid){
+    grid.querySelectorAll('input,button').forEach(function(el){ el.disabled=checked; });
+    grid.style.opacity = checked ? '.45' : '1';
+    if(checked){ grid.querySelectorAll('input[type=number]').forEach(function(el){ el.value=0; }); }
+  }
+  const hostileEl=document.getElementById('r_hostile');
+  const hostileRow=document.getElementById('r_hostile_row');
+  if(hostileEl){ hostileEl.disabled=checked; if(checked) hostileEl.checked=false; }
+  if(hostileRow) hostileRow.style.opacity = checked ? '.45' : '1';
+}
+const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병']];
 function reconTargetSummary(r){
+  if(r.unidentified==1) return '❓ 미식별 (식별된 것 없음)';
   const parts=RECON_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
   return parts.length ? parts.join(' · ') : '식별된 표적 없음';
 }
@@ -1042,8 +1056,10 @@ function rfields(){
   const el=document.getElementById('rfields');
   if(RKIND==='recon'){
     el.innerHTML=`<div class="card">
-      <div class="numgrid">${RECON_FIELD_LABELS.map(function(l){return numCell('r_'+l[0], l[1]);}).join('')}</div>
-      <label class="row" style="margin-top:11px;font-size:13px;padding-top:9px;border-top:1px dashed var(--line)">
+      <div class="numgrid" id="r_numgrid">${RECON_FIELD_LABELS.map(function(l){return numCell('r_'+l[0], l[1]);}).join('')}</div>
+      <label class="row" style="margin-top:11px;font-size:13px">
+        <input type="checkbox" id="r_unidentified" style="width:18px;height:18px;flex:none" onchange="onUnidentifiedToggle()"> ❓ 미식별 (정찰했으나 식별된 것 없음)</label>
+      <label class="row" id="r_hostile_row" style="margin-top:8px;font-size:13px;padding-top:9px;border-top:1px dashed var(--line)">
         <input type="checkbox" id="r_hostile" checked style="width:18px;height:18px;flex:none"> 🔺 적 식별 (지도에 적색 마름모로 표시)</label></div>`;
   }else if(RKIND==='attack'){
     el.innerHTML=`<div class="card">
@@ -1088,6 +1104,7 @@ async function submitReport(){
   if(RKIND==='recon'){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('r_'+l[0]); if(v>0) body[l[0]]=v; });
     body.hostile=document.getElementById('r_hostile').checked?1:0;
+    body.unidentified=document.getElementById('r_unidentified').checked?1:0;
   }
   else if(RKIND==='attack'){
     const activeBtn=document.querySelector('#r_attack_result_seg button.on');
@@ -1143,7 +1160,8 @@ function reportCardHtml(r){
   let editFields;
   if(r.kind==='recon'){
     editFields = `<div class="numgrid">${RECON_FIELD_LABELS.map(function(l){ return numCell('re_'+l[0]+'_'+r.id, l[1], r[l[0]]||0); }).join('')}</div>`
-      + `<label class="row" style="margin-top:10px;font-size:13px"><input type="checkbox" id="re_hostile_${r.id}" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`;
+      + `<label class="row" style="margin-top:10px;font-size:13px"><input type="checkbox" id="re_unidentified_${r.id}" ${r.unidentified==1?'checked':''} style="width:18px;height:18px;flex:none"> ❓ 미식별</label>`
+      + `<label class="row" style="margin-top:6px;font-size:13px"><input type="checkbox" id="re_hostile_${r.id}" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`;
   }else if(r.kind==='attack'){
     editFields = attackResultEditHtml(r, r.id);
   }else{
@@ -1178,6 +1196,7 @@ async function saveReportEdit(id, kind){
   if(kind==='recon'){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('re_'+l[0]); body[l[0]]=v>0?v:null; });
     body.hostile=document.getElementById('re_hostile_'+id).checked?1:0;
+    body.unidentified=document.getElementById('re_unidentified_'+id).checked?1:0;
   }else if(kind==='attack'){
     const seg=document.getElementById('re_attack_result_seg_'+id);
     const activeBtn=seg?seg.querySelector('button.on'):null;
