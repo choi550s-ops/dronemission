@@ -606,7 +606,7 @@ const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',compl
 
 function respTag(m){
   const t=m.response_type;
-  if(t==='ack') return '<span class="resp-chip resp-ack">✔ 수신확인</span>';
+  if(t==='ack') return '<span class="resp-chip resp-ack">✔ 수신확인'+(m.response_start_time?' · '+esc(m.response_start_time)+'부터 임무 시작':'')+'</span>';
   if(t==='unable') return '<span class="resp-chip resp-unable">✖ 임무불가'+(m.response_reason?' (사유: '+esc(m.response_reason)+')':'')+'</span>';
   if(t==='delay') return '<span class="resp-chip resp-delay">⏱ 준비시간 '+(m.response_delay_min||0)+'분'+(m.response_reason?' (사유: '+esc(m.response_reason)+')':'')+'</span>';
   return '<span class="resp-chip resp-none">⏳ 미응답</span>';

@@ -523,8 +523,9 @@ function route($path, $method)
         }
         $reason = pval($b, 'reason');
         $delay  = pval($b, 'delay_min');
-        $sql    = "UPDATE iuccs_missions SET response_type = ?, response_reason = ?, response_delay_min = ?, responded_at = NOW()";
-        $params = array($resp, $reason, $delay);
+        $startTime = ($resp === 'ack') ? pval($b, 'start_time') : null;
+        $sql    = "UPDATE iuccs_missions SET response_type = ?, response_reason = ?, response_delay_min = ?, response_start_time = ?, responded_at = NOW()";
+        $params = array($resp, $reason, $delay, $startTime);
         if ($resp === 'ack') { $sql .= ", status = 'acknowledged'"; }
         $sql   .= " WHERE id = ?";
         $params[] = $id;

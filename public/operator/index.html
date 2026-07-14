@@ -883,14 +883,28 @@ async function completeMission(id){
 function respWidget(m){
   if(m.status==='cancelled') return `<div class="geo" style="margin-top:9px;color:var(--muted)">🚫 이 임무는 취소되었습니다. 별도 조치가 필요 없습니다.</div>`;
   const t=m.response_type;
-  if(t==='ack') return `<div class="geo" style="margin-top:9px"><span class="mono" style="color:#6fe0a0">✔ 수신확인 완료</span></div>`;
+  if(t==='ack') return `<div class="geo" style="margin-top:9px"><span class="mono" style="color:#6fe0a0">✔ 수신확인 완료</span>${m.response_start_time?' · '+esc(m.response_start_time)+'부터 임무 시작':''}</div>`;
   if(t==='unable') return `<div class="geo" style="margin-top:9px;color:#ff8579">✖ 임무불가${m.response_reason?' (사유: '+esc(m.response_reason)+')':''}</div>`;
   if(t==='delay') return `<div class="geo" style="margin-top:9px;color:var(--amber)">⏱ 준비시간 : ${m.response_delay_min||0}분${m.response_reason?' (사유: '+esc(m.response_reason)+')':''}</div>`;
   return `
     <div id="respbtns_${m.id}" style="display:flex;gap:6px;margin-top:9px">
-      <button class="btn btn-ghost" style="padding:9px;font-size:12px;flex:1" onclick="respondMission(${m.id},'ack')">✔ 수신확인</button>
+      <button class="btn btn-ghost" style="padding:9px;font-size:12px;flex:1" onclick="showRespForm(${m.id},'ack')">✔ 수신확인</button>
       <button class="btn btn-ghost" style="padding:9px;font-size:12px;flex:1" onclick="showRespForm(${m.id},'unable')">✖ 임무불가</button>
       <button class="btn btn-ghost" style="padding:9px;font-size:12px;flex:1" onclick="showRespForm(${m.id},'delay')">⏱ 준비필요</button>
+    </div>
+    <div id="respform_ack_${m.id}" style="display:none;margin-top:9px">
+      <div class="lbl" style="margin-bottom:6px">임무 시작 시간</div>
+      <div style="display:flex;gap:5px;margin-bottom:7px">
+        <button type="button" class="btn btn-ghost" style="flex:1;padding:7px;font-size:11px" onclick="quickSetAckTime(${m.id},0)">지금</button>
+        <button type="button" class="btn btn-ghost" style="flex:1;padding:7px;font-size:11px" onclick="quickSetAckTime(${m.id},5)">5분뒤</button>
+        <button type="button" class="btn btn-ghost" style="flex:1;padding:7px;font-size:11px" onclick="quickSetAckTime(${m.id},10)">10분뒤</button>
+        <button type="button" class="btn btn-ghost" style="flex:1;padding:7px;font-size:11px" onclick="quickSetAckTime(${m.id},30)">30분뒤</button>
+      </div>
+      <input id="ack_time_${m.id}" type="time" style="margin-bottom:7px">
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost" style="padding:9px;font-size:12px;flex:1" onclick="cancelRespForm(${m.id})">취소</button>
+        <button class="btn btn-amber" style="padding:9px;font-size:12px;flex:1" onclick="respondMission(${m.id},'ack')">전송</button>
+      </div>
     </div>
     <div id="respform_unable_${m.id}" style="display:none;margin-top:9px">
       <input id="un_reason_${m.id}" placeholder="임무불가 사유" style="margin-bottom:7px">
@@ -908,16 +922,24 @@ function respWidget(m){
       </div>
     </div>`;
 }
+function fmtHM(d){ return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function quickSetAckTime(id, minutes){
+  const d=new Date(Date.now()+minutes*60000);
+  const el=document.getElementById('ack_time_'+id);
+  if(el) el.value=fmtHM(d);
+}
 function showRespForm(id,type){
   const b=document.getElementById('respbtns_'+id); if(b) b.style.display='none';
   const f=document.getElementById('respform_'+type+'_'+id); if(f) f.style.display='block';
+  if(type==='ack'){ quickSetAckTime(id,0); }
 }
 function cancelRespForm(id){
   const b=document.getElementById('respbtns_'+id); if(b) b.style.display='flex';
-  ['unable','delay'].forEach(function(t){ const f=document.getElementById('respform_'+t+'_'+id); if(f) f.style.display='none'; });
+  ['ack','unable','delay'].forEach(function(t){ const f=document.getElementById('respform_'+t+'_'+id); if(f) f.style.display='none'; });
 }
 async function respondMission(id,type){
   const body={id,response:type};
+  if(type==='ack'){ const e=document.getElementById('ack_time_'+id); body.start_time=e?e.value:''; }
   if(type==='unable'){ const e=document.getElementById('un_reason_'+id); body.reason=e?e.value:''; }
   if(type==='delay'){
     const em=document.getElementById('dl_min_'+id), er=document.getElementById('dl_reason_'+id);
