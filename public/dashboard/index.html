@@ -79,7 +79,7 @@
   .mcoords{font-size:11.5px;color:var(--text);margin-top:6px;max-height:120px;overflow:auto;line-height:1.55}
   .mcoords .mono{color:#cfe0f0}
   .resp-chip{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;display:inline-block}
-  .resp-none{background:rgba(124,144,168,.16);color:var(--muted)}
+  .resp-none{background:rgba(124,144,168,.2);color:var(--text)}
   .resp-ack{background:rgba(47,163,90,.16);color:#6fe0a0}
   .resp-unable{background:rgba(226,74,59,.16);color:#ff8579}
   .resp-delay{background:rgba(232,163,61,.16);color:var(--amber)}
@@ -648,7 +648,7 @@ function boardRowHtml(m, suffix){
   const statusCell = m.status==='completed'
     ? '<span class="chip" style="background:rgba(47,163,90,.18);color:#6fe0a0">✔ 임무종료</span>'
     : (m.status==='cancelled'
-      ? '<span class="chip" style="background:rgba(124,144,168,.18);color:var(--muted)">취소됨</span>'
+      ? '<span class="chip" style="background:rgba(124,144,168,.2);color:var(--text)">취소됨</span>'
       : `<span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span>`);
   const rowStyle = (m.status==='completed'||m.status==='cancelled') ? ' style="opacity:.6"' : '';
   const canCancel = ROLE==='admin' && m.status!=='completed' && m.status!=='cancelled';
