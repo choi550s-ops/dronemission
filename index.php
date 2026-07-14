@@ -473,7 +473,10 @@ function route($path, $method)
     if ($path === '/api/missions' && $method === 'GET') {
         $s   = Auth::require_auth();
         $tid = pval($_GET, 'team_id', $s['team_id']);
-        $st  = $pdo->prepare("SELECT * FROM iuccs_missions WHERE team_id = ? ORDER BY issued_at DESC LIMIT 50");
+        $st  = $pdo->prepare(
+            "SELECT m.*, (SELECT COUNT(*) FROM iuccs_reports r WHERE r.mission_id = m.id) AS report_count
+               FROM iuccs_missions m WHERE m.team_id = ? ORDER BY m.issued_at DESC LIMIT 50"
+        );
         $st->execute(array($tid));
         json_out(array('missions' => $st->fetchAll()));
     }

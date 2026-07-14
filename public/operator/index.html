@@ -963,8 +963,9 @@ async function renderMissions(){
       const gate=atk&&!(m.approved==1)?`<div class="warn" style="margin:9px 0">⚠ 지휘관 승인·교전규칙(ROE) 확인 후 수행 가능</div>`:'';
       const respBlock=respWidget(m);
       const canResultReport = m.response_type==='ack' && m.status!=='cancelled';
+      const hasReported = (+m.report_count>0) || m.status==='completed';
       const resultReportBlock = canResultReport
-        ? `<button class="btn btn-ghost" style="padding:9px;font-size:12.5px;width:100%;margin-top:9px" onclick="goToResultReport(${m.id},'${m.type}',${m.lat==null?'null':+m.lat},${m.lng==null?'null':+m.lng})">📋 결과보고</button>`
+        ? `<button class="btn btn-ghost" style="padding:9px;font-size:12.5px;width:100%;margin-top:9px" onclick="goToResultReport(${m.id},'${m.type}',${m.lat==null?'null':+m.lat},${m.lng==null?'null':+m.lng})">📋 ${hasReported?'결과 추가보고':'결과보고'}</button>`
         : '';
       const completeBlock=completeWidget(m);
       const statusChip = m.status==='completed'
