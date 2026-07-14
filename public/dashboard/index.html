@@ -516,14 +516,21 @@ function toMGRS(lat,lng){
 }
 function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallback||'-'; }
 function teamCoordText(lat,lng){ const m=toMGRS(lat,lng); return m||'GPS 위치 없음'; }
-const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병']];
+const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병'],['command_post','지휘소']];
+const ACTIVITY_LABELS_D={moving:'이동중',defending:'방어중',attacking:'공격중'};
+const DIRECTION_OPTS_D=['북','북동','동','남동','남','남서','서','북서'];
 const KIND_LABELS_D={recon:'정찰',attack:'공격',damage:'피해평가',photo:'사진'};
 const MTYPE_LABELS_D={recon:'정찰',attack:'공격',damage:'피해평가'};
 const MTYPE_BADGE_D={recon:'rgba(59,130,214,.18);color:#8fc0ff',attack:'rgba(226,74,59,.18);color:#ff8579',damage:'rgba(232,163,61,.18);color:#F3C070'};
 function reconTargetSummary(r){
   if(r.unidentified==1) return '❓ 미식별 (식별된 것 없음)';
   const parts=RECON_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
-  return parts.length ? parts.join(' · ') : '식별된 표적 없음';
+  let s = parts.length ? parts.join(' · ') : '식별된 표적 없음';
+  if(r.activity){
+    s += ' · '+(ACTIVITY_LABELS_D[r.activity]||r.activity);
+    if(r.activity==='moving' && r.direction){ s += '('+r.direction+')'; }
+  }
+  return s;
 }
 const DAMAGE_FIELD_LABELS=[['kia','사망'],['serious','중상'],['minor','경상'],['destroyed','완파'],['heavy_damage','중파'],['light_damage','소파']];
 function damageSummary(r){
@@ -1366,19 +1373,54 @@ function openReportEditModal(id){
   const r=LAST_REPORTS.find(function(x){return x.id===id;});
   if(!r){ toast('보고 정보를 찾을 수 없습니다'); return; }
   const body=document.getElementById('report_edit_body');
+  let html;
   if(r.kind==='recon'){
-    body.innerHTML = `<div class="numgrid">${RECON_FIELD_LABELS.map(function(l){ return numCellD('re_'+l[0], l[1], r[l[0]]||0); }).join('')}</div>`
+    html = `<div class="numgrid">${RECON_FIELD_LABELS.map(function(l){ return numCellD('re_'+l[0], l[1], r[l[0]]||0); }).join('')}</div>`
+      + activityEditHtmlD(r)
       + `<label class="row" style="margin-top:10px;font-size:13px"><input type="checkbox" id="re_unidentified" ${r.unidentified==1?'checked':''} style="width:18px;height:18px;flex:none"> ❓ 미식별</label>`
-      + `<label class="row" style="margin-top:6px;font-size:13px"><input type="checkbox" id="re_hostile" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`
-      + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'recon')">저장</button>`;
+      + `<label class="row" style="margin-top:6px;font-size:13px"><input type="checkbox" id="re_hostile" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`;
   } else if(r.kind==='attack'){
-    body.innerHTML = attackResultEditHtmlD(r)
-      + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'attack')">저장</button>`;
+    html = attackResultEditHtmlD(r);
   } else {
-    body.innerHTML = DAMAGE_FIELD_LABELS.map(function(l){ return numRowEditD('re_'+l[0], l[1], r[l[0]]||0); }).join('')
-      + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'damage')">저장</button>`;
+    html = DAMAGE_FIELD_LABELS.map(function(l){ return numRowEditD('re_'+l[0], l[1], r[l[0]]||0); }).join('');
   }
+  html += mgrsEditFieldsHtmlD(r)
+    + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'${r.kind}')">저장</button>`;
+  body.innerHTML = html;
   openModalEl('modal_report_edit');
+}
+function activityEditHtmlD(r){
+  const cur=r.activity||'';
+  const btns=['moving','defending','attacking'].map(function(v){
+    return `<button type="button" data-v="${v}" class="${cur===v?'on':''}" onclick="setActivityEditD('${v}')">${ACTIVITY_LABELS_D[v]}</button>`;
+  }).join('');
+  return `<div class="lbl" style="margin-top:10px;margin-bottom:6px">행동</div>
+    <div class="seg" id="re_activity_seg">${btns}</div>
+    <select id="re_direction" style="display:${cur==='moving'?'block':'none'};margin-top:8px">${DIRECTION_OPTS_D.map(function(d){return `<option value="${d}" ${r.direction===d?'selected':''}>${d}</option>`;}).join('')}</select>`;
+}
+function setActivityEditD(v){
+  const seg=document.getElementById('re_activity_seg');
+  const already = seg ? seg.querySelector(`button[data-v="${v}"]`).classList.contains('on') : false;
+  if(seg) seg.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', !already && b.dataset.v===v); });
+  const dirEl=document.getElementById('re_direction');
+  if(dirEl) dirEl.style.display = (!already && v==='moving') ? 'block' : 'none';
+}
+function mgrsEditFieldsHtmlD(r){
+  const mgrs = (r.lat!=null && r.lng!=null) ? toMGRS(+r.lat,+r.lng) : null;
+  const parts = mgrs ? mgrs.split(' ') : ['','','',''];
+  return `<div class="lbl" style="margin-top:10px;margin-bottom:4px">좌표 수정</div>
+    <div style="display:flex;gap:5px">
+      <input id="re_mgrs_zone" class="mono" value="${parts[0]||''}" placeholder="52S" style="width:22%;text-align:center;font-size:12px">
+      <input id="re_mgrs_sq" class="mono" value="${parts[1]||''}" placeholder="CG" style="width:18%;text-align:center;font-size:12px">
+      <input id="re_mgrs_e" class="mono" value="${parts[2]||''}" placeholder="12345" style="width:30%;text-align:center;font-size:12px">
+      <input id="re_mgrs_n" class="mono" value="${parts[3]||''}" placeholder="67890" style="width:30%;text-align:center;font-size:12px">
+    </div>`;
+}
+function readMgrsEditD(){
+  const g=k=>{const e=document.getElementById(k);return e?e.value:'';};
+  const ll=mgrsPartsToLatLng(g('re_mgrs_zone'), g('re_mgrs_sq'), g('re_mgrs_e'), g('re_mgrs_n'));
+  if(!ll) return null;
+  return {lat:ll[0], lng:ll[1], coord:toMGRS(ll[0],ll[1])||''};
 }
 function attackResultEditHtmlD(r){
   const cur=r.attack_result||'hit';
@@ -1407,6 +1449,10 @@ async function saveReportEditD(id, kind){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('re_'+l[0]); body[l[0]]=v>0?v:null; });
     body.hostile=document.getElementById('re_hostile').checked?1:0;
     body.unidentified=document.getElementById('re_unidentified').checked?1:0;
+    const actSeg=document.getElementById('re_activity_seg');
+    const actBtn=actSeg?actSeg.querySelector('button.on'):null;
+    body.activity = actBtn ? actBtn.dataset.v : null;
+    body.direction = (body.activity==='moving') ? document.getElementById('re_direction').value : null;
   }else if(kind==='attack'){
     const seg=document.getElementById('re_attack_result_seg');
     const activeBtn=seg?seg.querySelector('button.on'):null;
@@ -1415,6 +1461,9 @@ async function saveReportEditD(id, kind){
   }else{
     DAMAGE_FIELD_LABELS.forEach(function(l){ body[l[0]]=+g('re_'+l[0]); });
   }
+  const mgrsResult=readMgrsEditD();
+  if(mgrsResult){ body.lat=mgrsResult.lat; body.lng=mgrsResult.lng; body.coord=mgrsResult.coord; }
+  else{ toast('좌표 형식을 확인하세요 — 좌표 없이 나머지만 저장됩니다'); }
   try{
     await api('/reports/update','POST',body);
     toast('보고 수정됨'); closeModalEl('modal_report_edit');
