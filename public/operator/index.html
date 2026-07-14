@@ -42,6 +42,9 @@
   .seg button{flex:1;border:none;background:transparent;color:var(--muted);font-weight:700;font-size:13.5px;
     padding:9px;border-radius:7px;cursor:pointer;font-family:inherit}
   .seg button.on{background:var(--navy);color:#fff}
+  .chat-input-fixed{position:fixed;bottom:calc(64px + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);
+    width:100%;max-width:460px;z-index:35;background:var(--bg);padding:10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top:1px solid var(--line)}
   .status-chip{flex:1;border:1.5px solid;background:transparent;font-weight:800;font-size:11px;
     padding:9px 2px;border-radius:8px;cursor:pointer;font-family:inherit;transition:.15s}
   .tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;height:calc(64px + env(safe-area-inset-bottom, 0px));
@@ -1031,10 +1034,10 @@ async function renderChat(){
     const msgs=msgd.messages||[];
     v.innerHTML = `
       <h2>관리자와 대화</h2>
-      <div id="op_msg_history" style="display:flex;flex-direction:column;gap:7px;margin-bottom:9px"></div>
-      <div class="card">
-        <textarea id="op_msg_body" placeholder="메시지 입력" style="width:100%;min-height:56px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
-        <button class="btn btn-amber" style="width:100%;margin-top:8px;padding:10px" onclick="opSendMessage()">전송</button>
+      <div id="op_msg_history" style="display:flex;flex-direction:column;gap:7px;margin-bottom:110px"></div>
+      <div class="chat-input-fixed">
+        <textarea id="op_msg_body" placeholder="메시지 입력" style="width:100%;min-height:44px;padding:9px;border-radius:9px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);font-family:inherit;font-size:13px;resize:vertical"></textarea>
+        <button class="btn btn-amber" style="width:100%;margin-top:7px;padding:9px" onclick="opSendMessage()">전송</button>
       </div>`;
     renderOpMsgHistory(msgs.slice().reverse());
     window.scrollTo(0, document.body.scrollHeight);
