@@ -471,16 +471,27 @@ function addLocateBtn(map, containerId, onFound){
   const btn=document.createElement('button');
   btn.type='button'; btn.className='locate-btn'; btn.title='현재 위치로 이동'; btn.innerHTML='📍';
   L.DomEvent.disableClickPropagation(btn);
+  let accCircle=null;
   btn.onclick=function(){
     if(!navigator.geolocation){ toast('위치 정보를 사용할 수 없습니다'); return; }
-    btn.disabled=true;
+    btn.disabled=true; btn.innerHTML='⏳';
     navigator.geolocation.getCurrentPosition(function(pos){
-      const la=pos.coords.latitude, ln=pos.coords.longitude;
+      const la=pos.coords.latitude, ln=pos.coords.longitude, acc=pos.coords.accuracy;
       map.setView([la,ln], Math.max(map.getZoom(),15));
+      if(acc){
+        if(accCircle) map.removeLayer(accCircle);
+        accCircle=L.circle([la,ln],{radius:acc,color:'#3B82D6',weight:1.5,fillColor:'#3B82D6',fillOpacity:.12}).addTo(map);
+      }
       if(onFound) onFound(la,ln);
-      btn.disabled=false;
-    }, function(){ toast('위치 권한이 거부되었거나 가져올 수 없습니다'); btn.disabled=false; },
-    {enableHighAccuracy:true, maximumAge:30000, timeout:10000});
+      btn.disabled=false; btn.innerHTML='📍';
+    }, function(err){
+      const msgs={1:'위치 권한이 거부되었습니다 — 브라우저/기기 설정에서 위치 접근을 허용해 주세요.',
+        2:'위치를 확인할 수 없습니다 — GPS 신호가 약하거나 실내일 수 있습니다.',
+        3:'위치 확인 시간이 초과되었습니다 — 하늘이 보이는 곳에서 다시 시도해 주세요.'};
+      toast(msgs[err.code]||'위치를 가져올 수 없습니다');
+      btn.disabled=false; btn.innerHTML='📍';
+    },
+    {enableHighAccuracy:true, maximumAge:30000, timeout:20000});
   };
   container.appendChild(btn);
 }
