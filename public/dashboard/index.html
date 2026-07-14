@@ -668,8 +668,8 @@ async function loadBoard(){
       return ms.length ? ms.map(function(m){ return boardRowHtml(m,suffix); }).join('')
         : '<tr><td colspan="10" class="muted">표시할 임무가 없습니다.</td></tr>';
     };
-    const bEl=document.getElementById('board'); if(bEl) bEl.innerHTML=build(all.slice(0,20),'');
-    const bmEl=document.getElementById('board_modal'); if(bmEl) bmEl.innerHTML=build(all,'_modal');
+    const bEl=document.getElementById('board'); if(bEl && !isTypingInside('board')) bEl.innerHTML=build(all.slice(0,20),'');
+    const bmEl=document.getElementById('board_modal'); if(bmEl && !isTypingInside('board_modal')) bmEl.innerHTML=build(all,'_modal');
   }catch(e){}
 }
 
@@ -1193,6 +1193,13 @@ async function createDroneD(tid){
   catch(e){ toast('추가 실패 (중복 코드일 수 있음)'); }
 }
 
+function isTypingInside(containerId){
+  const el=document.getElementById(containerId);
+  const active=document.activeElement;
+  if(!el||!active) return false;
+  if(!el.contains(active)) return false;
+  return active.tagName==='INPUT'||active.tagName==='TEXTAREA'||active.tagName==='SELECT';
+}
 async function loadDash(){
   try{
     const d=await api('/dashboard');
@@ -1212,7 +1219,7 @@ async function loadDash(){
           <button class="expand-arrow" onclick="event.stopPropagation();openTeamDrawer(${t.id})" title="팀 상세관리">▶</button><button class="expand-arrow" onclick="event.stopPropagation();openMessageModal(${t.id},'${esc(t.team_no)}')" title="메시지 보내기">💬</button>${unreadBadge}${esc(t.team_no)}팀</td>
         <td data-label="상태"><span class="dot" style="background:${s[1]}"></span>${s[0].split('·')[1]||s[0]}</td>
         <td data-label="기체">${t.drone_count}</td></tr>`;}).join('');
-    if(TD_TEAM_ID!=null) loadTeamDrawer(TD_TEAM_ID);
+    if(TD_TEAM_ID!=null && !isTypingInside('teamPanel')) loadTeamDrawer(TD_TEAM_ID);
     const sel=document.getElementById('m_team');
     if(sel && !sel.dataset.filled){ sel.innerHTML=(d.teams||[]).map(t=>`<option value="${t.id}">${esc(t.team_no)}팀</option>`).join(''); sel.dataset.filled='1'; redrawRoute(); }
     const frSel=document.getElementById('fr_team');
@@ -1338,8 +1345,8 @@ async function loadReports(){
         <td data-label="내용" style="font-size:12px">${esc(c)}</td>
         <td data-label="조치">${actionCell}${fireBtn}${damageBtn}${editBtn}${delBtn}</td></tr>`;}).join('')
       :'<tr><td colspan="9" class="muted">보고 없음</td></tr>';
-    const rEl=document.getElementById('reports'); if(rEl) rEl.innerHTML=html;
-    const rmEl=document.getElementById('reports_modal'); if(rmEl) rmEl.innerHTML=html;
+    const rEl=document.getElementById('reports'); if(rEl && !isTypingInside('reports')) rEl.innerHTML=html;
+    const rmEl=document.getElementById('reports_modal'); if(rmEl && !isTypingInside('reports_modal')) rmEl.innerHTML=html;
   }catch(e){}
 }
 function openReportEditModal(id){
