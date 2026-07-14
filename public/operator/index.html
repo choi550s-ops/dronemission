@@ -208,7 +208,7 @@ async function pollForNew(){
       const maxId=Math.max.apply(null, ms.map(function(m){return m.id;}));
       if(OP_FIRST_POLL && maxId>OP_SEEN_MAX_MISSION){
         const newest=ms.reduce(function(a,b){return a.id>b.id?a:b;});
-        opNotify((newest.type==='attack'?'🎯 공격 임무 하달됨':'🎯 정찰 임무 하달됨'));
+        opNotify('🎯 '+(MTYPE_LABELS[newest.type]||newest.type)+' 임무 하달됨');
       }
       OP_SEEN_MAX_MISSION=Math.max(OP_SEEN_MAX_MISSION,maxId);
     }
@@ -345,6 +345,8 @@ function manualPositionReport(){
 function teamColorForNo(no){ const n=parseInt(no,10); const idx=isNaN(n)?0:Math.abs(n-1)%TEAMPAL.length; return TEAMPAL[idx]; }
 const COMM={good:'양호',weak:'미약',lost:'두절'}, GPS={fixed:'고정',searching:'탐색',none:'없음'};
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
+const MTYPE_LABELS={recon:'정찰',attack:'공격',damage:'피해평가'};
+const MTYPE_ICONS={recon:'🔵',attack:'🔴',damage:'🟠'};
 const FSTAT={received:'접수완료',held:'보류',decided:'결정'};
 function sdot(c){return `<span class="dot" style="background:${c}"></span>`}
 function modeBadge(){document.getElementById('rb_mode').className='modeb '+(MODE==='sim'?'mode-sim':'mode-real');
@@ -549,7 +551,7 @@ async function renderHome(){
       </div>`;}).join('');
     if(!drones.length) droneLines='<div class="card muted">배정된 기체가 없습니다.</div>';
     const alertLines = recent.length ? recent.map(m=>`<div class="card between">
-        <div class="row">${m.type==='attack'?'🔴':'🔵'} <span style="font-size:13px">${m.type==='attack'?'공격':'정찰'} 임무 · ${MSTAT[m.status]||m.status}</span></div>
+        <div class="row">${MTYPE_ICONS[m.type]||'🔵'} <span style="font-size:13px">${MTYPE_LABELS[m.type]||m.type} 임무 · ${MSTAT[m.status]||m.status}</span></div>
         <span class="mono muted" style="font-size:11px">#${m.id}</span></div>`).join('') : '<div class="card muted">알림이 없습니다.</div>';
     v.innerHTML=`
       <div class="lbl" style="margin:0">팀 상태 (직접 설정)</div>
@@ -852,8 +854,10 @@ async function renderMissions(){
     const ms=d.missions||[];
     if(!ms.length){ v.innerHTML='<div class="card muted">수신된 임무가 없습니다.</div>'; return; }
     const routes={};
+    const MTYPE_BADGE={recon:'rgba(59,130,214,.18);color:#8fc0ff',attack:'rgba(226,74,59,.18);color:#ff8579',damage:'rgba(232,163,61,.18);color:#F3C070'};
     v.innerHTML=ms.map(m=>{
       const atk=m.type==='attack';
+      const singlePoint = m.type==='attack' || m.type==='damage';
       let pts=null; if(m.route_points){ try{ pts=JSON.parse(m.route_points); }catch(e){} }
       if(pts&&pts.length) routes[m.id]=pts;
       const gate=atk&&!(m.approved==1)?`<div class="warn" style="margin:9px 0">⚠ 지휘관 승인·교전규칙(ROE) 확인 후 수행 가능</div>`:'';
@@ -865,16 +869,16 @@ async function renderMissions(){
           ? '<span class="chip" style="background:rgba(124,144,168,.16);color:var(--muted)">취소됨</span>'
           : `<span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber)">${MSTAT[m.status]||m.status}</span>`);
       const mapBlock=(pts&&pts.length)?`
-        <div class="lbl" style="margin:11px 0 0">${atk?'표적 위치':'경로 ('+pts.length+'개 지점)'}</div>
+        <div class="lbl" style="margin:11px 0 0">${singlePoint?'표적 위치':'경로 ('+pts.length+'개 지점)'}</div>
         <div id="mmap_${m.id}" class="pickmap" style="height:180px"></div>
         <div class="rcoords">${pts.map((p,i)=>'<div>'+(i+1)+') <span class="mono">'+esc(toMGRS(p[0],p[1])||'')+'</span></div>').join('')}</div>`:'';
       const cardStyle = (atk?'border-color:rgba(232,163,61,.45);':'') + (m.status==='completed'?'opacity:.7;':'');
       return `<div class="card" ${cardStyle?`style="${cardStyle}"`:''}>
         <div class="between" style="margin-bottom:8px">
-          <span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span>
+          <span class="badge" style="background:${MTYPE_BADGE[m.type]||MTYPE_BADGE.recon}">${MTYPE_LABELS[m.type]||m.type}</span>
           ${statusChip}</div>
         <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">위치</span><span class="mono" style="color:#CFE0F0">${esc(coordText(m.lat,m.lng,m.coord))}</span></div>
-        <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${atk?'방식':'경로'}</span><span class="val" style="font-size:13px">${esc(atk?(m.method||'표적지정'):(m.route||'-'))}</span></div>
+        <div class="between" style="font-size:13px;padding:3px 0"><span class="muted">${singlePoint?'방식':'경로'}</span><span class="val" style="font-size:13px">${esc(singlePoint?(m.method||'표적지정'):(m.route||'-'))}</span></div>
         ${mapBlock}${gate}${respBlock}${completeBlock}</div>`;}).join('');
     Object.keys(routes).forEach(function(id){ mountRouteMap('mmap_'+id, routes[id]); });
   }catch(e){ v.innerHTML=err(e); }

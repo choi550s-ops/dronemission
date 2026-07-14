@@ -273,7 +273,7 @@
         <h2>임무 지시</h2>
         <div style="display:flex;flex-direction:column;gap:9px">
           <select id="m_team" onchange="redrawRoute()"></select>
-          <select id="m_type" onchange="onTypeChange()"><option value="recon">정찰</option><option value="attack">공격</option></select>
+          <select id="m_type" onchange="onTypeChange()"><option value="recon">정찰</option><option value="attack">공격</option><option value="damage">피해평가</option></select>
           <div id="m_target_wrap" style="display:none">
             <input id="m_target" placeholder="표적 (예: 병력·차량 등)">
           </div>
@@ -515,6 +515,8 @@ function coordText(lat,lng,fallback){ const m=toMGRS(lat,lng); return m||fallbac
 function teamCoordText(lat,lng){ const m=toMGRS(lat,lng); return m||'GPS 위치 없음'; }
 const RECON_FIELD_LABELS=[['troops','병력'],['trucks','트럭'],['vehicles','차량'],['tanks','전차'],['armored','장갑차'],['artillery','포병']];
 const KIND_LABELS_D={recon:'정찰',attack:'공격',damage:'피해평가',photo:'사진'};
+const MTYPE_LABELS_D={recon:'정찰',attack:'공격',damage:'피해평가'};
+const MTYPE_BADGE_D={recon:'rgba(59,130,214,.18);color:#8fc0ff',attack:'rgba(226,74,59,.18);color:#ff8579',damage:'rgba(232,163,61,.18);color:#F3C070'};
 function reconTargetSummary(r){
   const parts=RECON_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
   return parts.length ? parts.join(' · ') : '식별된 표적 없음';
@@ -553,7 +555,7 @@ function routeTotalDist(pts){
 function missionDistanceLabel(m){
   const base=TEAMLATLNG[m.team_id];
   let pts=null; if(m.route_points){ try{ pts=JSON.parse(m.route_points); }catch(e){} }
-  if(m.type==='attack'){
+  if(m.type==='attack' || m.type==='damage'){
     let target=null;
     if(pts&&pts.length) target=pts[0];
     else if(m.lat!=null&&m.lng!=null) target=[+m.lat,+m.lng];
@@ -643,7 +645,7 @@ function boardRowHtml(m, suffix){
   return `<tr${rowStyle}>
     <td><input type="checkbox" class="rowchk-missions${suffix}" value="${m.id}"></td>
     <td class="mono" style="font-size:10.5px;color:var(--muted)">#${m.id}<br>${issuedTime}</td>
-    <td><span class="badge" style="background:${atk?'rgba(226,74,59,.18);color:#ff8579':'rgba(59,130,214,.18);color:#8fc0ff'}">${atk?'공격':'정찰'}</span></td>
+    <td><span class="badge" style="background:${MTYPE_BADGE_D[m.type]||MTYPE_BADGE_D.recon}">${MTYPE_LABELS_D[m.type]||m.type}</span></td>
     <td style="font-weight:700;color:${esc(TEAMCOLORS[m.team_id]||'#cfe0f0')}">${esc(teamNo)}팀</td>
     <td class="mono" style="font-size:11px" title="${m.target?('표적: '+esc(m.target)):''}">${esc(coordText(m.lat,m.lng,m.coord))}</td>
     <td style="font-size:11px">${missionDistanceLabel(m)}</td>
@@ -796,7 +798,7 @@ async function loadMap(){
       if(rp.length>1){
         const total=routeTotalDist(rp);
         L.polyline(rp,{color:color,weight:2.5,dashArray:'5,6',opacity:0.85})
-          .bindTooltip(esc(teamNo)+'팀 경로 · '+(mr.type==='attack'?'공격':'정찰')+' · '+fmtDist(total),{sticky:true})
+          .bindTooltip(esc(teamNo)+'팀 경로 · '+(MTYPE_LABELS_D[mr.type]||mr.type)+' · '+fmtDist(total),{sticky:true})
           .addTo(LG.missionRoutes);
       } else if(rp.length===1 && base){
         const d=haversine(base[0],base[1],rp[0][0],rp[0][1]);
@@ -859,7 +861,7 @@ function applyManualMGRS(){
     document.getElementById('m_mgrs_e').value, document.getElementById('m_mgrs_n').value);
   if(!ll){ toast('좌표 형식을 확인하세요 (예: 52S / CG / 12345 / 67890)'); return; }
   const type=document.getElementById('m_type').value;
-  if(type==='attack'){ ROUTE=[ll]; } else { ROUTE.push(ll); }
+  if(type==='attack'||type==='damage'){ ROUTE=[ll]; } else { ROUTE.push(ll); }
   redrawRoute();
   if(MAP) MAP.panTo(ll);
 }
@@ -869,7 +871,7 @@ function currentRouteColor(){
 }
 function addRoutePoint(lat,lng){
   const type=document.getElementById('m_type').value;
-  if(type==='attack'){ ROUTE=[[lat,lng]]; } else { ROUTE.push([lat,lng]); }
+  if(type==='attack'||type==='damage'){ ROUTE=[[lat,lng]]; } else { ROUTE.push([lat,lng]); }
   redrawRoute();
 }
 function redrawRoute(){
@@ -891,7 +893,7 @@ function redrawRoute(){
 
   const el=document.getElementById('m_coords');
   const rows=[];
-  if(type==='attack'){
+  if(type==='attack'||type==='damage'){
     if(ROUTE.length){
       const target=ROUTE[0];
       let distTxt='';
@@ -1319,6 +1321,7 @@ async function loadReports(){
         actionCell=`<button class="btn btn-ghost" onclick="ackReport(${r.id})">확인</button>`;
       }
       const fireBtn = (ROLE==='admin' && r.kind==='recon') ? fireFromReportBtn(r, coordStr) : '';
+      const damageBtn = (ROLE==='admin' && r.kind==='attack') ? damageFromReportBtn(r) : '';
       const editBtn = ROLE==='admin' ? ` <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="openReportEditModal(${r.id})">수정</button>` : '';
       const delBtn = ROLE==='admin' ? ` <button class="btn btn-ghost" style="padding:2px 7px;font-size:10px" onclick="deleteRow('reports',${r.id})">🗑</button>` : '';
       return `<tr><td><input type="checkbox" value="${r.id}"></td>
@@ -1328,7 +1331,7 @@ async function loadReports(){
         <td class="mono" data-label="좌표" style="font-size:11px">${esc(coordStr)}</td>
         <td data-label="모드"><span class="chip" style="background:${r.mode==='sim'?'rgba(232,163,61,.14);color:var(--amber)':'rgba(226,74,59,.14);color:#ff8579'}">${r.mode==='sim'?'모의':'실제'}</span></td>
         <td data-label="내용" style="font-size:12px">${esc(c)}</td>
-        <td data-label="조치">${actionCell}${fireBtn}${editBtn}${delBtn}</td></tr>`;}).join('')
+        <td data-label="조치">${actionCell}${fireBtn}${damageBtn}${editBtn}${delBtn}</td></tr>`;}).join('')
       :'<tr><td colspan="9" class="muted">보고 없음</td></tr>';
     const rEl=document.getElementById('reports'); if(rEl) rEl.innerHTML=html;
     const rmEl=document.getElementById('reports_modal'); if(rmEl) rmEl.innerHTML=html;
@@ -1394,6 +1397,10 @@ function fireFromReportBtn(r, coordStr){
   const targetDesc=reconTargetSummary(r);
   const targetArg=targetDesc.replace(/'/g,"\\'");
   return ` <button class="btn btn-ghost" style="padding:4px 7px;font-size:10px" onclick="prefillFireFromReport(${r.team_id},${latArg},${lngArg},'${coordArg}','${targetArg}')">🎯 화력</button>`;
+}
+function damageFromReportBtn(r){
+  const latArg = r.lat==null?'null':+r.lat, lngArg = r.lng==null?'null':+r.lng;
+  return ` <button class="btn btn-ghost" style="padding:4px 7px;font-size:10px" onclick="prefillDamageTarget(${latArg},${lngArg})">🎯 피해평가</button>`;
 }
 function hostileActionCell(r, coordStr){
   const at=r.action_taken||'none';
@@ -1608,15 +1615,27 @@ function prefillAttackTarget(lat, lng, coord, targetInfo){
   sel.addEventListener('change', function stopBlink(){ sel.classList.remove('pulse-highlight'); }, {once:true});
   toast('🎯 공격 임무 대상 지정됨(표적정보 반영) — 팀을 선택하고 "임무 하달"을 누르세요');
 }
+function prefillDamageTarget(lat, lng){
+  const typeSel=document.getElementById('m_type');
+  typeSel.value='damage'; onTypeChange();
+  ROUTE = (lat!=null && lng!=null && !isNaN(lat) && !isNaN(lng)) ? [[+lat,+lng]] : [];
+  redrawRoute();
+  const sel=document.getElementById('m_team');
+  sel.focus();
+  sel.classList.add('pulse-highlight');
+  sel.addEventListener('change', function stopBlink(){ sel.classList.remove('pulse-highlight'); }, {once:true});
+  toast('🎯 피해평가 임무 대상 지정됨 — 팀을 선택하고 "임무 하달"을 누르세요');
+}
 
 async function issueMission(){
   const body={team_id:document.getElementById('m_team').value,type:document.getElementById('m_type').value,
     route:document.getElementById('m_route').value};
   if(body.type==='attack'){ body.method='designated'; body.target=document.getElementById('m_target').value; }
+  else if(body.type==='damage'){ body.method='designated'; }
   if(ROUTE.length){ body.route_points=ROUTE; body.lat=ROUTE[0][0]; body.lng=ROUTE[0][1];
     body.coord=toMGRS(ROUTE[0][0],ROUTE[0][1])||''; }
   try{ const r=await api('/missions','POST',body);
-    alert(r.status==='pending_approval'?'공격 임무 생성됨 — 승인·ROE 확인 대기':'임무 하달됨 (경로 '+ROUTE.length+'개 지점)');
+    alert(r.status==='pending_approval'?'공격 임무 생성됨 — 승인·ROE 확인 대기':(MTYPE_LABELS_D[body.type]||body.type)+' 임무 하달됨'+(body.type==='recon'?' (경로 '+ROUTE.length+'개 지점)':''));
     clearRoute(); document.getElementById('m_route').value=''; document.getElementById('m_target').value='';
     ['m_mgrs_zone','m_mgrs_sq','m_mgrs_e','m_mgrs_n'].forEach(function(id){ const e=document.getElementById(id); if(e) e.value=''; });
     if(DRAW) toggleDraw();

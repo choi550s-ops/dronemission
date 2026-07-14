@@ -479,7 +479,8 @@ function route($path, $method)
     if ($path === '/api/missions' && $method === 'POST') {
         $s    = Auth::require_auth(array('admin', 'leader'));
         $b    = body_json();
-        $type = (pval($b, 'type', 'recon') === 'attack') ? 'attack' : 'recon';
+        $type = pval($b, 'type', 'recon');
+        if (!in_array($type, array('recon', 'attack', 'damage'), true)) { $type = 'recon'; }
         $status = ($type === 'attack') ? 'pending_approval' : 'issued';
         $mode   = (pval($b, 'mode', 'real') === 'sim') ? 'sim' : 'real';
         $rp = pval($b, 'route_points');
