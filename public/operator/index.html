@@ -9,9 +9,9 @@
     --steel:#2E5A88;--ink:#EAF2FC;--text:#C4D4E7;--muted:#7C90A8;--amber:#E8A33D;--amberD:#C9871B;
     --red:#E24A3B;--yellow:#E1A800;--green:#2FA35A;--blue:#3B82D6;}
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-  html{scroll-padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px))}
+  html{scroll-padding-bottom:calc(80px + env(safe-area-inset-bottom, 0px));background:var(--bg)}
   body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
-    max-width:460px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+    max-width:460px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
   .mono{font-family:"SF Mono",ui-monospace,Consolas,monospace}
   .ribbon{padding:9px 15px 8px;background:linear-gradient(180deg,#15243a,#111e31);border-bottom:1px solid var(--line);
     display:flex;flex-direction:column;gap:4px;position:sticky;top:0;z-index:10}
@@ -114,7 +114,7 @@
     <div style="color:var(--ink);font-weight:800;font-size:18px">통합무인전투 통제체계</div>
     <div class="mono" style="color:var(--amber);font-size:11px;letter-spacing:.14em;margin-top:5px">IUCCS · OPERATOR</div>
   </div>
-  <div><div class="lbl">팀 번호</div><input id="in_team" class="mono" placeholder="예: 03" value="03" inputmode="numeric"></div>
+  <div><div class="lbl">팀 번호</div><select id="in_team" class="mono"><option value="">불러오는 중…</option></select></div>
   <div><div class="lbl">비밀번호</div><input id="in_pw" type="password" placeholder="관리자 할당 비밀번호"></div>
   <div><div class="lbl">운용 모드</div>
     <div class="seg" id="loginmode">
@@ -1063,6 +1063,20 @@ async function opSendMessage(){
 }
 
 function err(e){return `<div class="warn">불러오기 실패: ${esc(e&&e.error||'네트워크 오류')}</div>`;}
+
+async function loadTeamSelector(){
+  const sel=document.getElementById('in_team');
+  if(!sel) return;
+  try{
+    const r=await fetch(API+'/public/team-list');
+    const d=await r.json();
+    const teams=d.teams||[];
+    sel.innerHTML = teams.length
+      ? teams.map(function(t){ return `<option value="${esc(t.team_no)}">${esc(t.team_no)}팀</option>`; }).join('')
+      : '<option value="">등록된 팀이 없습니다</option>';
+  }catch(e){ sel.innerHTML='<option value="">불러오기 실패</option>'; }
+}
+loadTeamSelector();
 
 // ---- restore session ----
 (function(){

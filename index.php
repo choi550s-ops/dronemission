@@ -101,6 +101,11 @@ function route($path, $method)
     if ($path === '/api/time') {
         json_out(array('now' => date('c'), 'ts' => time()));
     }
+    if ($path === '/api/public/team-list') {
+        // No auth required — used only to populate the login screen's
+        // team selector. Exposes team_no only, nothing sensitive.
+        json_out(array('teams' => $pdo->query("SELECT team_no FROM iuccs_teams ORDER BY team_no")->fetchAll()));
+    }
     if ($path === '/api/login' && $method === 'POST') {
         $b = body_json();
         $loginId = trim(pval($b, 'team_no', pval($b, 'login_id', '')));
