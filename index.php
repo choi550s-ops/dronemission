@@ -585,7 +585,14 @@ function route($path, $method)
 
     if ($path === '/api/reports' && $method === 'GET') {
         Auth::require_auth();
-        json_out(array('reports' => $pdo->query("SELECT * FROM iuccs_reports ORDER BY created_at DESC LIMIT 100")->fetchAll()));
+        $tid = pval($_GET, 'team_id');
+        if ($tid) {
+            $st = $pdo->prepare("SELECT * FROM iuccs_reports WHERE team_id = ? ORDER BY created_at DESC LIMIT 100");
+            $st->execute(array($tid));
+            json_out(array('reports' => $st->fetchAll()));
+        } else {
+            json_out(array('reports' => $pdo->query("SELECT * FROM iuccs_reports ORDER BY created_at DESC LIMIT 100")->fetchAll()));
+        }
     }
     if ($path === '/api/reports' && $method === 'POST') {
         $s   = Auth::require_auth();
@@ -610,6 +617,33 @@ function route($path, $method)
         $id = $pdo->lastInsertId();
         log_activity('team#' . pval($s, 'team_id', '?'), 'report_submit', 'report', $id, $kind);
         json_out(array('id' => $id), 201);
+    }
+    if ($path === '/api/reports/update' && $method === 'POST') {
+        $s  = Auth::require_auth();
+        $b  = body_json();
+        $id = pval($b, 'id');
+        if (!$id) { json_out(array('error' => 'id_required'), 400); }
+        if ($s['role'] !== 'admin') {
+            $chk = $pdo->prepare("SELECT team_id FROM iuccs_reports WHERE id = ?");
+            $chk->execute(array($id));
+            $row = $chk->fetch();
+            if (!$row || $row['team_id'] != $s['team_id']) { json_out(array('error' => 'forbidden'), 403); }
+        }
+        $fields = array(
+            'troops', 'trucks', 'vehicles', 'tanks', 'armored', 'artillery', 'hostile',
+            'armed', 'unarmed', 'kia', 'serious', 'minor', 'failed', 'note',
+        );
+        $sets = array(); $vals = array();
+        foreach ($fields as $f) {
+            if (!array_key_exists($f, $b)) { continue; }
+            $sets[] = "$f = ?";
+            $vals[] = ($f === 'hostile' || $f === 'failed') ? (pval($b, $f) ? 1 : 0) : pval($b, $f);
+        }
+        if (!$sets) { json_out(array('error' => 'no_fields'), 400); }
+        $vals[] = $id;
+        $pdo->prepare("UPDATE iuccs_reports SET " . implode(', ', $sets) . " WHERE id = ?")->execute($vals);
+        log_activity(($s['role'] === 'admin') ? ('user#' . $s['user_id']) : ('team#' . $s['team_id']), 'report_update', 'report', $id, null);
+        json_out(array('ok' => true));
     }
     if ($path === '/api/reports/ack' && $method === 'POST') {
         Auth::require_auth(array('admin', 'leader', 'fire_coord'));
