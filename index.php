@@ -604,11 +604,13 @@ function route($path, $method)
         $s   = Auth::require_auth();
         $b   = body_json();
         $kind = in_array(pval($b, 'kind', ''), array('recon', 'attack', 'photo', 'damage'), true) ? $b['kind'] : 'recon';
+        $attackResult = in_array(pval($b, 'attack_result', ''), array('hit', 'unknown', 'other'), true) ? $b['attack_result'] : null;
         $st  = $pdo->prepare(
             "INSERT INTO iuccs_reports
                 (mission_id, team_id, kind, mode, coord, lat, lng, troops, trucks, vehicles, tanks, armored, artillery,
-                 armed, unarmed, scale, kia, serious, minor, destroyed, heavy_damage, light_damage, failed, note, hostile)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+                 armed, unarmed, scale, kia, serious, minor, destroyed, heavy_damage, light_damage, failed, note, hostile,
+                 attack_result, attack_result_note)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
         );
         $st->execute(array(
             pval($b, 'mission_id'), pval($b, 'team_id', $s['team_id']), $kind,
@@ -620,6 +622,7 @@ function route($path, $method)
             pval($b, 'kia'), pval($b, 'serious'), pval($b, 'minor'),
             pval($b, 'destroyed'), pval($b, 'heavy_damage'), pval($b, 'light_damage'),
             pval($b, 'failed') ? 1 : 0, pval($b, 'note'), pval($b, 'hostile') ? 1 : 0,
+            $attackResult, pval($b, 'attack_result_note'),
         ));
         $id = $pdo->lastInsertId();
         log_activity('team#' . pval($s, 'team_id', '?'), 'report_submit', 'report', $id, $kind);
@@ -639,10 +642,13 @@ function route($path, $method)
         $fields = array(
             'troops', 'trucks', 'vehicles', 'tanks', 'armored', 'artillery', 'hostile',
             'armed', 'unarmed', 'kia', 'serious', 'minor', 'destroyed', 'heavy_damage', 'light_damage', 'failed', 'note',
+            'attack_result', 'attack_result_note',
         );
+        $enum = array('attack_result' => array('hit', 'unknown', 'other'));
         $sets = array(); $vals = array();
         foreach ($fields as $f) {
             if (!array_key_exists($f, $b)) { continue; }
+            if (isset($enum[$f]) && !in_array($b[$f], $enum[$f], true)) { continue; }
             $sets[] = "$f = ?";
             $vals[] = ($f === 'hostile' || $f === 'failed') ? (pval($b, $f) ? 1 : 0) : pval($b, $f);
         }

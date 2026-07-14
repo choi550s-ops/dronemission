@@ -961,7 +961,21 @@ function rfields(){
       <label class="row" style="margin-top:9px;font-size:13px;padding-top:9px;border-top:1px dashed var(--line)">
         <input type="checkbox" id="r_hostile" checked style="width:18px;height:18px;flex:none"> 🔺 적 식별 (지도에 적색 마름모로 표시)</label></div>`;
   }else if(RKIND==='attack'){
-    el.innerHTML=`<div class="card">${numRow('r_armed','무장')}${numRow('r_unarmed','비무장')}</div>`;
+    el.innerHTML=`<div class="card">
+      <div class="lbl" style="margin-bottom:6px">공격 결과</div>
+      <div class="seg" id="r_attack_result_seg">
+        <button type="button" data-v="hit" class="on">명중</button>
+        <button type="button" data-v="unknown">불명</button>
+        <button type="button" data-v="other">기타</button>
+      </div>
+      <input id="r_attack_result_note" placeholder="기타 내용 직접 입력" style="display:none;margin-top:8px"></div>`;
+    document.querySelectorAll('#r_attack_result_seg button').forEach(function(b){
+      b.onclick=function(){
+        document.querySelectorAll('#r_attack_result_seg button').forEach(function(x){x.classList.remove('on');});
+        b.classList.add('on');
+        document.getElementById('r_attack_result_note').style.display = b.dataset.v==='other' ? 'block' : 'none';
+      };
+    });
   }else{
     el.innerHTML=`<div class="card">
       <div class="lbl" style="margin-bottom:6px">인명 피해</div>
@@ -980,9 +994,9 @@ async function submitReport(){
     body.hostile=document.getElementById('r_hostile').checked?1:0;
   }
   else if(RKIND==='attack'){
-    const armed=+g('r_armed'), unarmed=+g('r_unarmed');
-    if(armed>0) body.armed=armed;
-    if(unarmed>0) body.unarmed=unarmed;
+    const activeBtn=document.querySelector('#r_attack_result_seg button.on');
+    body.attack_result = activeBtn ? activeBtn.dataset.v : 'hit';
+    if(body.attack_result==='other'){ body.attack_result_note=document.getElementById('r_attack_result_note').value.trim(); }
   }
   else{
     ['kia','serious','minor','destroyed','heavy_damage','light_damage'].forEach(function(k){ const v=+g('r_'+k); if(v>0) body[k]=v; });
@@ -1000,11 +1014,32 @@ async function loadMyReports(){
   }catch(e){ el.innerHTML='<div class="warn">불러오기 실패</div>'; }
 }
 const KIND_LABELS={recon:'정찰',attack:'공격',damage:'피해평가',photo:'사진'};
+const ATTACK_RESULT_LABELS={hit:'명중',unknown:'불명',other:'기타'};
+function attackResultSummary(r){
+  if(!r.attack_result) return '결과 미기재';
+  const lbl=ATTACK_RESULT_LABELS[r.attack_result]||r.attack_result;
+  return r.attack_result==='other' && r.attack_result_note ? lbl+' · '+r.attack_result_note : lbl;
+}
+function attackResultEditHtml(r, idSuffix){
+  const cur=r.attack_result||'hit';
+  const btns=['hit','unknown','other'].map(function(v){
+    return `<button type="button" data-v="${v}" class="${cur===v?'on':''}" onclick="setAttackResultEdit('${idSuffix}','${v}')">${ATTACK_RESULT_LABELS[v]}</button>`;
+  }).join('');
+  return `<div class="lbl" style="margin-bottom:6px">공격 결과</div>
+    <div class="seg" id="re_attack_result_seg_${idSuffix}">${btns}</div>
+    <input id="re_attack_result_note_${idSuffix}" value="${esc(r.attack_result_note||'')}" placeholder="기타 내용 직접 입력" style="display:${cur==='other'?'block':'none'};margin-top:8px">`;
+}
+function setAttackResultEdit(idSuffix, v){
+  const seg=document.getElementById('re_attack_result_seg_'+idSuffix);
+  if(seg) seg.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===v); });
+  const noteEl=document.getElementById('re_attack_result_note_'+idSuffix);
+  if(noteEl) noteEl.style.display = v==='other' ? 'block' : 'none';
+}
 function reportCardHtml(r){
   const kindLbl = KIND_LABELS[r.kind] || r.kind;
   let summary;
   if(r.kind==='recon') summary=reconTargetSummary(r);
-  else if(r.kind==='attack') summary=`무장 ${r.armed??0}·비무장 ${r.unarmed??0}`;
+  else if(r.kind==='attack') summary=attackResultSummary(r);
   else if(r.kind==='damage') summary=damageSummary(r);
   else summary=r.note||'';
   const hostileTag = (r.kind==='recon' && r.hostile==1) ? ' · 🔺적식별' : '';
@@ -1014,7 +1049,7 @@ function reportCardHtml(r){
     editFields = RECON_FIELD_LABELS.map(function(l){ return numRowEdit('re_'+l[0]+'_'+r.id, l[1], r[l[0]]||0); }).join('')
       + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_hostile_${r.id}" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`;
   }else if(r.kind==='attack'){
-    editFields = ['armed','unarmed'].map(function(k){ return numRowEdit('re_'+k+'_'+r.id, {armed:'무장',unarmed:'비무장'}[k], r[k]||0); }).join('');
+    editFields = attackResultEditHtml(r, r.id);
   }else{
     editFields = DAMAGE_FIELD_LABELS.map(function(l){ return numRowEdit('re_'+l[0]+'_'+r.id, l[1], r[l[0]]||0); }).join('');
   }
@@ -1044,7 +1079,10 @@ async function saveReportEdit(id, kind){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('re_'+l[0]); body[l[0]]=v>0?v:null; });
     body.hostile=document.getElementById('re_hostile_'+id).checked?1:0;
   }else if(kind==='attack'){
-    ['armed','unarmed'].forEach(function(k){ body[k]=+g('re_'+k); });
+    const seg=document.getElementById('re_attack_result_seg_'+id);
+    const activeBtn=seg?seg.querySelector('button.on'):null;
+    body.attack_result = activeBtn ? activeBtn.dataset.v : 'hit';
+    body.attack_result_note = body.attack_result==='other' ? document.getElementById('re_attack_result_note_'+id).value.trim() : null;
   }else{
     DAMAGE_FIELD_LABELS.forEach(function(l){ body[l[0]]=+g('re_'+l[0]); });
   }

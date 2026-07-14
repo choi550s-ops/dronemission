@@ -524,6 +524,12 @@ function damageSummary(r){
   const parts=DAMAGE_FIELD_LABELS.filter(function(l){ return r[l[0]]!=null && +r[l[0]]>0; }).map(function(l){ return l[1]+' '+r[l[0]]; });
   return parts.length ? parts.join(' · ') : '확인된 피해 없음';
 }
+const ATTACK_RESULT_LABELS_D={hit:'명중',unknown:'불명',other:'기타'};
+function attackResultSummary(r){
+  if(!r.attack_result) return '결과 미기재';
+  const lbl=ATTACK_RESULT_LABELS_D[r.attack_result]||r.attack_result;
+  return r.attack_result==='other' && r.attack_result_note ? lbl+' · '+r.attack_result_note : lbl;
+}
 
 // ---- per-team color ----
 const TEAMPAL=['#56B4E9','#E69F00','#009E73','#CC79A7','#D55E00','#0072B2','#B0BEC5','#F0E442'];
@@ -1299,7 +1305,7 @@ async function loadReports(){
     const html = rs.length?rs.map(r=>{
       let c;
       if(r.kind==='recon') c=`${reconTargetSummary(r)}${r.hostile==1?' · 🔺적식별':''}`;
-      else if(r.kind==='attack') c=`무장 ${r.armed??0}·비무장 ${r.unarmed??0}`;
+      else if(r.kind==='attack') c=attackResultSummary(r);
       else if(r.kind==='damage') c=damageSummary(r);
       else c=esc(r.note||'');
       const teamNo=TEAMNO[r.team_id]||r.team_id;
@@ -1337,14 +1343,28 @@ function openReportEditModal(id){
       + `<label class="row" style="margin-top:8px;font-size:13px"><input type="checkbox" id="re_hostile" ${r.hostile==1?'checked':''} style="width:18px;height:18px;flex:none"> 🔺 적 식별</label>`
       + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'recon')">저장</button>`;
   } else if(r.kind==='attack'){
-    const lbls={armed:'무장',unarmed:'비무장'};
-    body.innerHTML = ['armed','unarmed'].map(function(k){ return numRowEditD('re_'+k, lbls[k], r[k]||0); }).join('')
+    body.innerHTML = attackResultEditHtmlD(r)
       + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'attack')">저장</button>`;
   } else {
     body.innerHTML = DAMAGE_FIELD_LABELS.map(function(l){ return numRowEditD('re_'+l[0], l[1], r[l[0]]||0); }).join('')
       + `<button class="btn btn-amber" style="width:100%;margin-top:12px;padding:10px" onclick="saveReportEditD(${id},'damage')">저장</button>`;
   }
   openModalEl('modal_report_edit');
+}
+function attackResultEditHtmlD(r){
+  const cur=r.attack_result||'hit';
+  const btns=['hit','unknown','other'].map(function(v){
+    return `<button type="button" data-v="${v}" class="${cur===v?'on':''}" onclick="setAttackResultEditD('${v}')">${ATTACK_RESULT_LABELS_D[v]}</button>`;
+  }).join('');
+  return `<div class="lbl" style="margin-bottom:6px">공격 결과</div>
+    <div class="seg" id="re_attack_result_seg">${btns}</div>
+    <input id="re_attack_result_note" value="${esc(r.attack_result_note||'')}" placeholder="기타 내용 직접 입력" style="display:${cur==='other'?'block':'none'};margin-top:8px">`;
+}
+function setAttackResultEditD(v){
+  const seg=document.getElementById('re_attack_result_seg');
+  if(seg) seg.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===v); });
+  const noteEl=document.getElementById('re_attack_result_note');
+  if(noteEl) noteEl.style.display = v==='other' ? 'block' : 'none';
 }
 function numRowEditD(id,label,val){return `<div class="between" style="padding:6px 0"><span style="font-size:13px">${label}</span>
   <input id="${id}" type="number" inputmode="numeric" style="width:90px;text-align:right" value="${val}" onfocus="this.select()"></div>`;}
@@ -1355,7 +1375,10 @@ async function saveReportEditD(id, kind){
     RECON_FIELD_LABELS.forEach(function(l){ const v=+g('re_'+l[0]); body[l[0]]=v>0?v:null; });
     body.hostile=document.getElementById('re_hostile').checked?1:0;
   }else if(kind==='attack'){
-    ['armed','unarmed'].forEach(function(k){ body[k]=+g('re_'+k); });
+    const seg=document.getElementById('re_attack_result_seg');
+    const activeBtn=seg?seg.querySelector('button.on'):null;
+    body.attack_result = activeBtn ? activeBtn.dataset.v : 'hit';
+    body.attack_result_note = body.attack_result==='other' ? document.getElementById('re_attack_result_note').value.trim() : null;
   }else{
     DAMAGE_FIELD_LABELS.forEach(function(l){ body[l[0]]=+g('re_'+l[0]); });
   }
