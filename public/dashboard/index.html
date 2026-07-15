@@ -385,7 +385,7 @@
     </div>
     <div class="card">
       <div class="between" style="flex:none">
-        <h2 style="margin:0">최근 보고 (전체)</h2>
+        <h2 style="margin:0">임무결과 보고 (전체)</h2>
         <div style="display:flex;align-items:center;gap:10px">
           <select id="reports_kind_filter" onchange="loadReports()" style="padding:3px 7px;font-size:10.5px;width:auto">
             <option value="">전체 종류</option>
@@ -421,7 +421,7 @@
 </div>
 <div id="modal_reports" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_reports')">
   <div class="modal-box">
-    <div class="modal-head"><h2 style="margin:0">최근 보고 — 전체보기</h2>
+    <div class="modal-head"><h2 style="margin:0">임무결과 보고 — 전체보기</h2>
       <div style="display:flex;gap:8px">
         <button class="btn btn-ghost" onclick="bulkDelete('reports','_modal')">선택 삭제</button>
         <button class="btn btn-ghost" onclick="closeModalEl('modal_reports')">✕ 닫기</button>
@@ -1395,7 +1395,7 @@ async function loadReports(){
     const kindFilter = document.getElementById('reports_kind_filter') ? document.getElementById('reports_kind_filter').value : '';
     let filtered = allReports;
     if(kindFilter){ filtered = filtered.filter(function(r){ return r.kind===kindFilter; }); }
-    const rs = filtered.slice(0,20);
+    const rs = filtered;
     LAST_REPORTS=rs;
     if(allReports.length){
       const maxId=Math.max.apply(null, allReports.map(function(r){return r.id;}));

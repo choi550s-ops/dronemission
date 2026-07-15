@@ -608,7 +608,7 @@ function route($path, $method)
             $st->execute(array($tid));
             json_out(array('reports' => $st->fetchAll()));
         } else {
-            json_out(array('reports' => $pdo->query("SELECT * FROM iuccs_reports ORDER BY created_at DESC LIMIT 100")->fetchAll()));
+            json_out(array('reports' => $pdo->query("SELECT * FROM iuccs_reports ORDER BY created_at DESC")->fetchAll()));
         }
     }
     if ($path === '/api/reports' && $method === 'POST') {
