@@ -1712,9 +1712,17 @@ let FIRST_POLL_DONE=false, SEEN_MAX_REPORT=0, SEEN_MAX_FIRE=0, SEEN_MAX_MSG=0, N
 function playBeep(){
   try{
     const Ctx=window.AudioContext||window.webkitAudioContext; if(!Ctx) return;
-    const ctx=new Ctx(); const o=ctx.createOscillator(); const g=ctx.createGain();
-    o.connect(g); g.connect(ctx.destination); o.frequency.value=880; g.gain.value=0.16;
-    o.start(); setTimeout(function(){ o.stop(); ctx.close(); },220);
+    const ctx=new Ctx(); const dur=1.4;
+    const o=ctx.createOscillator(); const g=ctx.createGain();
+    o.connect(g); g.connect(ctx.destination); o.type='sine';
+    const n=100, curve=new Float32Array(n);
+    for(let i=0;i<n;i++){ const t=i/(n-1); curve[i]=825+175*Math.sin(t*Math.PI*2*3); }
+    o.frequency.setValueCurveAtTime(curve, ctx.currentTime, dur);
+    g.gain.setValueAtTime(0.0001, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.16, ctx.currentTime+0.06);
+    g.gain.setValueAtTime(0.16, ctx.currentTime+dur-0.15);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
+    o.start(); setTimeout(function(){ o.stop(); ctx.close(); },dur*1000+80);
   }catch(e){}
 }
 function alertPopup(msg){
