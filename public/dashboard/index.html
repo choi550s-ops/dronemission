@@ -38,6 +38,7 @@
   select,input{background:var(--surface2);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:7px 8px;font-size:12.5px;font-family:inherit;width:100%}
   .muted{color:var(--muted)}
   a[href^="tel:"],a[href^="sms:"]{color:inherit!important;text-decoration:none!important}
+  #wakeLockBtn.active{color:var(--amber)}
   .between{display:flex;align-items:center;justify-content:space-between}
   /* login overlay */
   #login{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:50}
@@ -205,6 +206,10 @@
   <span class="build">[시범운용]</span>
   <span class="modeb mode-real" id="mode">실제</span>
   <span class="clk mono" id="clk">--:--:--</span>
+  <button id="wakeLockBtn" onclick="toggleWakeLock()" title="화면 항상 켜짐"
+    style="background:none;border:none;color:var(--muted);margin-left:10px;padding:0 2px;cursor:pointer;line-height:1;display:flex;align-items:center">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+  </button>
   <button id="resetBtn" onclick="openModalEl('modal_reset')" title="전체 데이터 초기화" style="display:none;background:none;border:none;color:#ff8579;font-size:16px;margin-left:10px;padding:0 2px;cursor:pointer;line-height:1">⚠</button>
   <button id="dash_logout" onclick="doLogout()" title="로그아웃"
     style="background:none;border:none;color:var(--muted);margin-left:10px;padding:0 2px;cursor:pointer;line-height:1;display:flex;align-items:center">
@@ -597,7 +602,10 @@ let TEAMNO={}, TEAMCOLORS={};
 
 async function api(path,method='GET',body=null){
   const h={'Content-Type':'application/json'}; if(TOKEN)h['Authorization']='Bearer '+TOKEN;
-  const r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):null});
+  const ac=new AbortController(); const timer=setTimeout(function(){ac.abort();},12000);
+  let r;
+  try{ r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):null,signal:ac.signal}); }
+  finally{ clearTimeout(timer); }
   let d={};try{d=await r.json()}catch(e){} if(!r.ok)throw d; return d;
 }
 async function login(){
@@ -615,8 +623,46 @@ function fmtClock(d){
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}(${days[d.getDay()]}) ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 function startClock(){setInterval(()=>document.getElementById('clk').textContent=fmtClock(new Date()),1000);}
+let WAKE_LOCK=null, WAKE_LOCK_WANTED=false;
+async function acquireWakeLock(){
+  if(!('wakeLock' in navigator)) return false;
+  try{
+    WAKE_LOCK = await navigator.wakeLock.request('screen');
+    WAKE_LOCK.addEventListener('release', function(){ WAKE_LOCK=null; updateWakeLockBtn(); });
+    return true;
+  }catch(e){ return false; }
+}
+function updateWakeLockBtn(){
+  const btn=document.getElementById('wakeLockBtn');
+  if(btn) btn.classList.toggle('active', !!WAKE_LOCK);
+}
+async function toggleWakeLock(){
+  if(WAKE_LOCK_WANTED){
+    WAKE_LOCK_WANTED=false;
+    if(WAKE_LOCK){ try{ await WAKE_LOCK.release(); }catch(e){} WAKE_LOCK=null; }
+    updateWakeLockBtn();
+    toast('화면 자동 꺼짐이 다시 적용됩니다');
+    return;
+  }
+  if(!('wakeLock' in navigator)){ toast('이 브라우저는 화면 유지 기능을 지원하지 않습니다'); return; }
+  const ok = await acquireWakeLock();
+  WAKE_LOCK_WANTED = ok;
+  updateWakeLockBtn();
+  toast(ok?'📌 화면이 꺼지지 않도록 유지됩니다':'화면 유지 활성화에 실패했습니다');
+}
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState==='visible' && WAKE_LOCK_WANTED && !WAKE_LOCK){
+    acquireWakeLock().then(updateWakeLockBtn);
+  }
+});
 
-async function loadAll(){ await Promise.all([loadDash(),loadFires(),loadReports(),loadMap(),loadBoard(),pollAlerts()]); FIRST_POLL_DONE=true; }
+let LOAD_ALL_INFLIGHT=false;
+async function loadAll(){
+  if(LOAD_ALL_INFLIGHT) return; // previous cycle still running (slow network/host) — skip this tick rather than piling up
+  LOAD_ALL_INFLIGHT=true;
+  try{ await Promise.all([loadDash(),loadFires(),loadReports(),loadMap(),loadBoard(),pollAlerts()]); FIRST_POLL_DONE=true; }
+  finally{ LOAD_ALL_INFLIGHT=false; }
+}
 const MSTAT={issued:'하달',acknowledged:'확인',in_progress:'수행중',completed:'완료',cancelled:'취소',pending_approval:'승인대기'};
 
 function respTag(m){

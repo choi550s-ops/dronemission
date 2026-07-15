@@ -181,7 +181,10 @@ let TOKEN=null, SESS={}, MODE='real';
 async function api(path, method='GET', body=null){
   const h={'Content-Type':'application/json'};
   if(TOKEN) h['Authorization']='Bearer '+TOKEN;
-  const r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):null});
+  const ac=new AbortController(); const timer=setTimeout(function(){ac.abort();},12000);
+  let r;
+  try{ r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):null,signal:ac.signal}); }
+  finally{ clearTimeout(timer); }
   let d={}; try{d=await r.json()}catch(e){}
   if(!r.ok) throw d;
   return d;
@@ -219,7 +222,11 @@ function opNotify(msg){
   try{ if(window.Notification && Notification.permission==='granted'){ new Notification('IUCCS', {body:msg}); } }catch(e){}
 }
 let OP_FIRST_POLL=false, OP_SEEN_MAX_MISSION=0, OP_SEEN_MAX_MSG=0;
+let POLL_FOR_NEW_INFLIGHT=false;
 async function pollForNew(){
+  if(POLL_FOR_NEW_INFLIGHT) return;
+  POLL_FOR_NEW_INFLIGHT=true;
+  try{
   try{
     const d=await api('/missions?team_id='+(SESS.team_id||''));
     const ms=d.missions||[];
@@ -247,6 +254,7 @@ async function pollForNew(){
     }
   }catch(e){}
   OP_FIRST_POLL=true;
+  }finally{ POLL_FOR_NEW_INFLIGHT=false; }
 }
 function updateMissionAlertBanner(missions){
   const el=document.getElementById('mission_alert_banner');
