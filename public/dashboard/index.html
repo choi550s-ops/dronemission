@@ -243,6 +243,7 @@
             <option value="sat">🛰 위성</option>
           </select>
           <span class="lyr" onclick="fitAllView()" style="background:var(--steel);color:#fff;border-color:var(--steel)">⤢ 전체보기</span>
+          <span class="lyr" onclick="openAnalysisModal()" style="background:var(--amberD);color:#fff;border-color:var(--amberD)">📊 표적 분석</span>
           <span class="lyr on" data-layer="teams" onclick="toggleLayer(this)">팀</span>
           <span class="lyr on" data-layer="reports" onclick="toggleLayer(this)">정찰</span>
           <span class="lyr on" data-layer="fires" onclick="toggleLayer(this)">화력요청</span>
@@ -449,6 +450,29 @@
     <div class="modal-body" id="fires_modal" style="display:flex;flex-direction:column;gap:8px"></div>
   </div>
 </div>
+
+<div id="modal_analysis" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_analysis')">
+  <div class="modal-box" style="width:min(820px,94vw)">
+    <div class="modal-head"><h2 style="margin:0">📊 표적 분석 (정찰보고 기반)</h2>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="an_hours" onchange="loadAnalysis()" style="width:auto;padding:5px 8px;font-size:12px">
+          <option value="1">최근 1시간</option>
+          <option value="6">최근 6시간</option>
+          <option value="24" selected>최근 24시간</option>
+          <option value="168">최근 7일</option>
+          <option value="8760">전체</option>
+        </select>
+        <select id="an_team" onchange="loadAnalysis()" style="width:auto;padding:5px 8px;font-size:12px">
+          <option value="">전체 팀</option>
+        </select>
+        <button class="btn btn-ghost" onclick="closeModalEl('modal_analysis')">✕ 닫기</button>
+      </div></div>
+    <div class="modal-body" id="analysis_body">
+      <div class="muted" style="font-size:12.5px">불러오는 중…</div>
+    </div>
+  </div>
+</div>
+
 
 <div id="modal_report_edit" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModalEl('modal_report_edit')">
   <div class="modal-box" style="width:min(420px,92vw)">
@@ -754,6 +778,102 @@ async function loadBoard(){
 let MAP=null, LG={teams:null,reports:null,fires:null,route:null,missionRoutes:null,frpoint:null},
   layerOn={teams:true,reports:true,fires:true,missionRoutes:true}, TEAM_MARKERS={},
   MAP_FIRST_FIT=false, LAST_PTS=[];
+const TARGET_LABELS_AN = {troops:'병력',trucks:'트럭',vehicles:'차량',tanks:'전차',armored:'장갑차',artillery:'포병',mortar:'박격포',command_post:'지휘소'};
+let AN_MAP=null;
+async function openAnalysisModal(){
+  openModalEl('modal_analysis');
+  const sel=document.getElementById('an_team');
+  if(sel && !sel.dataset.filled){
+    sel.innerHTML = '<option value="">전체 팀</option>' + Object.keys(TEAMNO).map(function(tid){
+      return `<option value="${tid}">${esc(TEAMNO[tid])}팀</option>`;
+    }).join('');
+    sel.dataset.filled='1';
+  }
+  loadAnalysis();
+}
+async function loadAnalysis(){
+  const body=document.getElementById('analysis_body');
+  if(!body) return;
+  body.innerHTML='<div class="muted" style="font-size:12.5px">불러오는 중…</div>';
+  try{
+    const hours=document.getElementById('an_hours').value;
+    const teamId=document.getElementById('an_team').value;
+    let q='/analysis/recon?hours='+hours;
+    if(teamId) q+='&team_id='+teamId;
+    const d=await api(q);
+    renderAnalysis(d);
+  }catch(e){ body.innerHTML='<div class="warn">분석 데이터를 불러오지 못했습니다.</div>'; }
+}
+function renderAnalysis(d){
+  const body=document.getElementById('analysis_body');
+  if(!d.report_count){
+    body.innerHTML='<div class="muted" style="font-size:12.5px">해당 기간에 정찰보고가 없습니다.</div>';
+    return;
+  }
+  const byType = d.summary.by_type;
+  const typeKeys = Object.keys(TARGET_LABELS_AN);
+  const typeChips = typeKeys.filter(function(k){return byType[k]>0;})
+    .map(function(k){ return `<span class="chip" style="background:rgba(232,163,61,.14);color:var(--amber);margin:2px 4px 2px 0">${TARGET_LABELS_AN[k]} ${byType[k]}</span>`; }).join('');
+  const teamRows = Object.keys(d.summary.by_team).map(function(tid){
+    const t=d.summary.by_team[tid];
+    const parts=typeKeys.filter(function(k){return t[k]>0;}).map(function(k){return TARGET_LABELS_AN[k]+' '+t[k];});
+    return `<div class="between" style="font-size:12.5px;padding:4px 0"><span style="color:${teamColorForNo(TEAMNO[tid]||'')};font-weight:700">${esc(TEAMNO[tid]||tid)}팀</span><span class="muted">${parts.length?parts.join(' · '):'식별된 표적 없음'}</span></div>`;
+  }).join('');
+
+  const hotspots = d.hotspots||[];
+  const hotspotRows = hotspots.slice(0,10).map(function(h,i){
+    const parts=typeKeys.filter(function(k){return h.totals[k]>0;}).map(function(k){return TARGET_LABELS_AN[k]+' '+h.totals[k];});
+    return `<div class="between" style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--line)">
+      <span>#${i+1} <span class="mono">${esc(coordText(h.lat,h.lng))}</span> · ${parts.length?parts.join(' · '):'미식별 위주'}</span>
+      <span class="chip" style="background:rgba(226,74,59,.14);color:#ff8579">보고 ${h.report_count}건</span>
+    </div>`;
+  }).join('');
+
+  const movement = d.movement||{};
+  const moveSections = Object.keys(movement).map(function(tid){
+    const entries=movement[tid];
+    const line = entries.map(function(e){
+      const t=esc(String(e.time)).slice(5,16);
+      const act=e.activity==='attacking'?'공격중':'이동중';
+      return `${t} ${act}(${esc(e.direction)})`;
+    }).join(' → ');
+    return `<div style="font-size:12px;padding:5px 0"><span style="color:${teamColorForNo(TEAMNO[tid]||'')};font-weight:700">${esc(TEAMNO[tid]||tid)}팀</span>: ${line}</div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="lbl" style="margin-bottom:6px">위협 요약 (정찰보고 ${d.report_count}건${d.summary.unidentified_count?' · 미식별 '+d.summary.unidentified_count+'건':''})</div>
+    <div class="card" style="margin-bottom:14px">
+      <div style="margin-bottom:8px">${typeChips||'<span class="muted" style="font-size:12.5px">식별된 표적 없음</span>'}</div>
+      ${teamRows}
+    </div>
+    <div class="lbl" style="margin-bottom:6px">핫스팟 (표적 밀집지역, 반경 500m 기준 군집)</div>
+    <div class="card" style="margin-bottom:14px">
+      <div id="an_map" style="height:220px;border-radius:9px;overflow:hidden;margin-bottom:8px"></div>
+      ${hotspotRows||'<div class="muted" style="font-size:12px">군집이 없습니다.</div>'}
+    </div>
+    <div class="lbl" style="margin-bottom:6px">이동 패턴 (행동=이동중/공격중 + 방향 기록)</div>
+    <div class="card">
+      ${moveSections||'<div class="muted" style="font-size:12px">이동/공격 방향 기록이 없습니다.</div>'}
+    </div>`;
+
+  mountAnalysisMap(hotspots);
+}
+function mountAnalysisMap(hotspots){
+  const el=document.getElementById('an_map');
+  if(!el || typeof L==='undefined') return;
+  if(AN_MAP){ AN_MAP.remove(); AN_MAP=null; }
+  if(!hotspots.length){ el.innerHTML='<div class="muted" style="font-size:12px;padding:10px">표시할 위치가 없습니다.</div>'; return; }
+  AN_MAP=L.map('an_map',{zoomControl:false,attributionControl:false}).setView([hotspots[0].lat,hotspots[0].lng],12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:19}).addTo(AN_MAP);
+  const bounds=[];
+  hotspots.forEach(function(h){
+    const radius=Math.max(80, Math.min(500, h.target_total*40+80));
+    L.circle([h.lat,h.lng],{radius:radius,color:'#ff5b5b',weight:1.5,fillColor:'#ff5b5b',fillOpacity:.25}).addTo(AN_MAP)
+      .bindTooltip('보고 '+h.report_count+'건 · 표적 '+h.target_total+'개',{sticky:true});
+    bounds.push([h.lat,h.lng]);
+  });
+  if(bounds.length>1) AN_MAP.fitBounds(bounds,{padding:[20,20]});
+}
 function fitAllView(){
   if(!MAP||!LAST_PTS.length) return;
   try{ MAP.fitBounds(LAST_PTS,{padding:[30,30],maxZoom:15}); }catch(e){}

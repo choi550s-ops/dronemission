@@ -611,6 +611,107 @@ function route($path, $method)
             json_out(array('reports' => $pdo->query("SELECT * FROM iuccs_reports ORDER BY created_at DESC")->fetchAll()));
         }
     }
+
+    if ($path === '/api/analysis/recon' && $method === 'GET') {
+        Auth::require_auth(array('admin', 'leader', 'fire_coord'));
+        $hours  = (int) pval($_GET, 'hours', 24);
+        if ($hours <= 0) { $hours = 24; }
+        $teamId = pval($_GET, 'team_id');
+
+        $sql = "SELECT id, team_id, lat, lng, coord, troops, trucks, vehicles, tanks, armored, artillery, mortar,
+                       command_post, unidentified, hostile, activity, direction, created_at
+                  FROM iuccs_reports
+                 WHERE kind = 'recon' AND lat IS NOT NULL AND created_at >= (NOW() - INTERVAL ? HOUR)";
+        $params = array($hours);
+        if ($teamId) { $sql .= " AND team_id = ?"; $params[] = $teamId; }
+        $sql .= " ORDER BY created_at ASC";
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $reports = $st->fetchAll();
+
+        $typeFields = array('troops', 'trucks', 'vehicles', 'tanks', 'armored', 'artillery', 'mortar', 'command_post');
+
+        // ---- 1) threat summary: totals by target type, overall and per team ----
+        $byType = array_fill_keys($typeFields, 0);
+        $byTeam = array();
+        $unidentifiedCount = 0;
+        foreach ($reports as $r) {
+            if ((int) $r['unidentified'] === 1) { $unidentifiedCount++; }
+            if (!isset($byTeam[$r['team_id']])) { $byTeam[$r['team_id']] = array_fill_keys($typeFields, 0); }
+            foreach ($typeFields as $f) {
+                $v = (int) (isset($r[$f]) ? $r[$f] : 0);
+                $byType[$f] += $v;
+                $byTeam[$r['team_id']][$f] += $v;
+            }
+        }
+
+        // ---- 2) hotspots: simple greedy distance-based clustering (~500m) ----
+        $clusters = array();
+        foreach ($reports as $r) {
+            $lat = (float) $r['lat']; $lng = (float) $r['lng'];
+            $bestIdx = -1; $bestDist = null;
+            foreach ($clusters as $i => $c) {
+                $d = haversine_m($c['lat'], $c['lng'], $lat, $lng);
+                if ($d <= 500 && ($bestDist === null || $d < $bestDist)) { $bestDist = $d; $bestIdx = $i; }
+            }
+            if ($bestIdx >= 0) {
+                $clusters[$bestIdx]['reports'][] = $r;
+                $n = count($clusters[$bestIdx]['reports']);
+                $sumLat = 0; $sumLng = 0;
+                foreach ($clusters[$bestIdx]['reports'] as $cr) { $sumLat += (float) $cr['lat']; $sumLng += (float) $cr['lng']; }
+                $clusters[$bestIdx]['lat'] = $sumLat / $n;
+                $clusters[$bestIdx]['lng'] = $sumLng / $n;
+            } else {
+                $clusters[] = array('lat' => $lat, 'lng' => $lng, 'reports' => array($r));
+            }
+        }
+        $hotspots = array();
+        foreach ($clusters as $c) {
+            $totals = array_fill_keys($typeFields, 0);
+            $teams = array(); $latest = null; $hostileCount = 0;
+            foreach ($c['reports'] as $r) {
+                foreach ($typeFields as $f) { $totals[$f] += (int) (isset($r[$f]) ? $r[$f] : 0); }
+                $teams[$r['team_id']] = true;
+                if ((int) $r['hostile'] === 1) { $hostileCount++; }
+                if ($latest === null || $r['created_at'] > $latest) { $latest = $r['created_at']; }
+            }
+            $targetSum = array_sum($totals);
+            if ($targetSum <= 0 && count($c['reports']) <= 1) { continue; } // skip lone empty/unidentified points
+            $hotspots[] = array(
+                'lat' => $c['lat'], 'lng' => $c['lng'],
+                'report_count' => count($c['reports']),
+                'target_total' => $targetSum,
+                'totals' => $totals,
+                'teams' => array_keys($teams),
+                'hostile_count' => $hostileCount,
+                'latest_at' => $latest,
+            );
+        }
+        usort($hotspots, function ($a, $b) {
+            if ($a['target_total'] == $b['target_total']) { return 0; }
+            return ($a['target_total'] > $b['target_total']) ? -1 : 1;
+        });
+
+        // ---- 3) movement timeline: chronological moving/attacking+direction entries per team ----
+        $movement = array();
+        foreach ($reports as $r) {
+            if ($r['activity'] !== 'moving' && $r['activity'] !== 'attacking') { continue; }
+            if (empty($r['direction'])) { continue; }
+            if (!isset($movement[$r['team_id']])) { $movement[$r['team_id']] = array(); }
+            $movement[$r['team_id']][] = array(
+                'time' => $r['created_at'], 'coord' => $r['coord'], 'lat' => $r['lat'], 'lng' => $r['lng'],
+                'activity' => $r['activity'], 'direction' => $r['direction'],
+            );
+        }
+
+        json_out(array(
+            'hours' => $hours,
+            'report_count' => count($reports),
+            'summary' => array('by_type' => $byType, 'by_team' => $byTeam, 'unidentified_count' => $unidentifiedCount),
+            'hotspots' => $hotspots,
+            'movement' => $movement,
+        ));
+    }
     if ($path === '/api/reports' && $method === 'POST') {
         $s   = Auth::require_auth();
         $b   = body_json();
