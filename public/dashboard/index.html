@@ -645,7 +645,11 @@ async function login(){
     document.getElementById('login').style.display='none'; document.getElementById('wrap').style.display='flex';
     startClock(); loadAll(); setInterval(loadAll,10000); ensureNotifyPermission();
     document.getElementById('resetBtn').style.display = ROLE==='admin' ? 'inline' : 'none';
-  }catch(e){ document.getElementById('l_err').style.display='block'; }
+  }catch(e){
+    const el=document.getElementById('l_err');
+    el.textContent=(e&&e.error==='maintenance')?(e.message||'현재 접속이 일시적으로 제한되어 있습니다.'):'접속 실패 — 계정·비밀번호를 확인하세요.';
+    el.style.display='block';
+  }
 }
 function fmtClock(d){
   const days=['일','월','화','수','목','금','토'];

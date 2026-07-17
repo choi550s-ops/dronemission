@@ -1,6 +1,12 @@
 <?php
 // Config loader + small compatibility polyfills (works on PHP 5.4+).
 
+// ---- temporary login lockout ----
+// Set to true to block all logins (code-level switch — flip and redeploy
+// to toggle). Overridden by MAINTENANCE_MODE=1/0 in .env if that's set,
+// so the server can also be toggled directly without a redeploy.
+define('MAINTENANCE_MODE_DEFAULT', true);
+
 // ---- compatibility helpers ----
 if (!function_exists('pval')) {
     // safe array read: pval($arr,'key','default')
@@ -98,6 +104,12 @@ function config()
             'name'          => $get('APP_NAME', 'IUCCS'),
             'env'           => $get('APP_ENV', 'production'),
             'init_password' => $get('INIT_PASSWORD', 'changeme1234'),
+            // Temporary login lockout switch. Checked two ways so it can be
+            // flipped either by editing .env on the server directly, or by
+            // changing the code constant below and redeploying — whichever
+            // is more convenient at the time. .env (if set) takes priority.
+            'maintenance_mode' => $get('MAINTENANCE_MODE', MAINTENANCE_MODE_DEFAULT ? '1' : '0') === '1',
+            'maintenance_message' => $get('MAINTENANCE_MESSAGE', '프로그램 개발 중으로 임시로 접속을 차단합니다.'),
         ),
     );
     return $c;

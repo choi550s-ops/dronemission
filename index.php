@@ -107,6 +107,10 @@ function route($path, $method)
         json_out(array('teams' => $pdo->query("SELECT team_no FROM iuccs_teams ORDER BY team_no")->fetchAll()));
     }
     if ($path === '/api/login' && $method === 'POST') {
+        $cfg = config();
+        if (!empty($cfg['app']['maintenance_mode'])) {
+            json_out(array('error' => 'maintenance', 'message' => $cfg['app']['maintenance_message']), 503);
+        }
         $b = body_json();
         $loginId = trim(pval($b, 'team_no', pval($b, 'login_id', '')));
         $r = Auth::login($loginId, pval($b, 'password', ''), pval($b, 'mode', 'real'));
