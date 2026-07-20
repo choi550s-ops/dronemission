@@ -50,3 +50,24 @@ function haversine_m($lat1, $lng1, $lat2, $lng2)
     $a = pow(sin($dLat / 2), 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * pow(sin($dLng / 2), 2);
     return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
 }
+
+function get_setting($key, $default = null)
+{
+    try {
+        $st = Database::pdo()->prepare("SELECT setting_value FROM iuccs_settings WHERE setting_key = ?");
+        $st->execute(array($key));
+        $row = $st->fetch();
+        return $row ? $row['setting_value'] : $default;
+    } catch (Exception $e) {
+        return $default;
+    }
+}
+
+function set_setting($key, $value)
+{
+    $st = Database::pdo()->prepare(
+        "INSERT INTO iuccs_settings(setting_key, setting_value) VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)"
+    );
+    $st->execute(array($key, $value));
+}

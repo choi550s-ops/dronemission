@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no, url=no">
+<title>IUCCS 접속 관제</title>
+<style>
+  :root{--bg:#0A111E;--panel:#0E1A2E;--surface:#152439;--surface2:#0b1626;--line:#24384F;
+    --navy:#1F3A5F;--steel:#2E5A88;--ink:#EAF2FC;--text:#C4D4E7;--muted:#7C90A8;--amber:#E8A33D;--amberD:#C9871B;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .box{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:28px}
+  h1{color:var(--ink);font-size:18px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:12.5px;margin:0 0 22px}
+  input{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:9px;color:var(--ink);
+    padding:11px 12px;font-size:14px;margin-bottom:10px;font-family:inherit}
+  textarea{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:9px;color:var(--ink);
+    padding:11px 12px;font-size:13px;font-family:inherit;resize:vertical;min-height:64px}
+  button{border:none;border-radius:9px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;width:100%}
+  .btn-amber{background:var(--amber);color:#1a1200}
+  .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--line)}
+  .warn{color:#ff8579;font-size:12.5px;margin:6px 0 12px;display:none}
+  .lbl{color:var(--muted);font-size:11.5px;font-weight:700;margin-bottom:6px}
+  .statusCard{border-radius:12px;padding:16px;margin-bottom:16px;text-align:center}
+  .statusCard.blocked{background:rgba(226,74,59,.14);border:1px solid rgba(226,74,59,.4)}
+  .statusCard.open{background:rgba(47,163,90,.14);border:1px solid rgba(47,163,90,.4)}
+  .statusCard .big{font-size:16px;font-weight:800;margin-bottom:2px}
+  .statusCard.blocked .big{color:#ff8579}
+  .statusCard.open .big{color:#6fe0a0}
+  .row{display:flex;gap:10px}
+  .row button{flex:1}
+  .muted{color:var(--muted);font-size:11.5px}
+  #app{display:none}
+</style>
+</head>
+<body>
+
+<div id="login" class="box">
+  <h1>IUCCS 접속 관제</h1>
+  <p class="sub">관리자 계정으로 로그인하면 전체 로그인 차단/허용을 제어할 수 있습니다.</p>
+  <input id="l_id" placeholder="관리자 ID">
+  <input id="l_pw" placeholder="비밀번호" type="password">
+  <div id="l_err" class="warn"></div>
+  <button class="btn-amber" onclick="login()">로그인</button>
+</div>
+
+<div id="app" class="box">
+  <h1>IUCCS 접속 관제</h1>
+  <p class="sub">일반 로그인 화면에서 표시되는 차단 여부를 여기서 즉시 켜고 끌 수 있습니다.</p>
+
+  <div id="statusCard" class="statusCard">
+    <div class="big" id="statusBig">-</div>
+    <div class="muted" id="statusSub"></div>
+  </div>
+
+  <div class="lbl">차단 시 표시할 안내 문구</div>
+  <textarea id="msgInput" placeholder="프로그램 개발 중으로 임시로 접속을 차단합니다."></textarea>
+
+  <div class="row" style="margin-top:14px">
+    <button class="btn-ghost" onclick="setMaintenance(false)">🔓 접속 허용</button>
+    <button class="btn-ghost" onclick="setMaintenance(true)" style="background:rgba(226,74,59,.16);color:#ff8579;border-color:rgba(226,74,59,.4)">🔒 접속 차단</button>
+  </div>
+  <div class="muted" style="margin-top:14px;line-height:1.6">
+    ※ 관리자 계정은 차단 중에도 항상 로그인할 수 있습니다 (이 페이지에 계속 접근할 수 있도록).<br>
+    차단은 신규 로그인만 막으며, 이미 접속 중인 사용자의 세션은 유지됩니다.
+  </div>
+  <button class="btn-ghost" style="margin-top:16px" onclick="doLogout()">로그아웃</button>
+</div>
+
+<script>
+const API = location.pathname.replace(/\/public\/.*$/, '') + '/api';
+let TOKEN = sessionStorage.getItem('iuccs_ctrl_token') || null;
+
+async function api(path, method='GET', body=null){
+  const h={'Content-Type':'application/json'};
+  if(TOKEN) h['Authorization']='Bearer '+TOKEN;
+  const ac=new AbortController(); const timer=setTimeout(function(){ac.abort();},12000);
+  let r;
+  try{ r=await fetch(API+path,{method,headers:h,body:body?JSON.stringify(body):null,signal:ac.signal}); }
+  finally{ clearTimeout(timer); }
+  let d={}; try{ d=await r.json(); }catch(e){}
+  if(!r.ok) throw d;
+  return d;
+}
+
+async function login(){
+  const err=document.getElementById('l_err'); err.style.display='none';
+  try{
+    const r=await api('/login','POST',{
+      login_id: document.getElementById('l_id').value.trim(),
+      password: document.getElementById('l_pw').value
+    });
+    if(r.role!=='admin'){
+      err.textContent='관리자 계정만 접속 관제를 사용할 수 있습니다.';
+      err.style.display='block';
+      return;
+    }
+    TOKEN=r.token;
+    sessionStorage.setItem('iuccs_ctrl_token', TOKEN);
+    enterApp();
+  }catch(e){
+    err.textContent = (e && e.error==='maintenance') ? '차단 중에도 관리자 계정은 접속 가능해야 합니다 — 문의가 필요한 오류입니다.' : '로그인 실패 — 계정·비밀번호를 확인하세요.';
+    err.style.display='block';
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem('iuccs_ctrl_token');
+  TOKEN=null;
+  document.getElementById('app').style.display='none';
+  document.getElementById('login').style.display='block';
+}
+function enterApp(){
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  loadStatus();
+}
+async function loadStatus(){
+  try{
+    const r = await api('/settings/maintenance');
+    renderStatus(r.enabled, r.message);
+  }catch(e){
+    document.getElementById('statusBig').textContent='상태를 불러오지 못했습니다';
+  }
+}
+function renderStatus(enabled, message){
+  const card=document.getElementById('statusCard');
+  card.className='statusCard '+(enabled?'blocked':'open');
+  document.getElementById('statusBig').textContent = enabled ? '🔒 현재 로그인 차단 중' : '🔓 현재 로그인 허용 중';
+  document.getElementById('statusSub').textContent = enabled ? '관리자 외 모든 로그인이 차단됩니다.' : '누구나 정상적으로 로그인할 수 있습니다.';
+  document.getElementById('msgInput').value = message || '';
+}
+async function setMaintenance(enabled){
+  try{
+    const message = document.getElementById('msgInput').value.trim();
+    const r = await api('/settings/maintenance','POST',{enabled: enabled, message: message});
+    await loadStatus();
+  }catch(e){
+    alert('변경 실패 — 다시 시도해 주세요.');
+  }
+}
+
+if(TOKEN){ enterApp(); }
+</script>
+</body>
+</html>

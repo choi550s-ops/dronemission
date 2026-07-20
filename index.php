@@ -108,16 +108,43 @@ function route($path, $method)
     }
     if ($path === '/api/login' && $method === 'POST') {
         $cfg = config();
-        if (!empty($cfg['app']['maintenance_mode'])) {
-            json_out(array('error' => 'maintenance', 'message' => $cfg['app']['maintenance_message']), 503);
-        }
+        $maintOn = get_setting('maintenance_mode');
+        $maintOn = ($maintOn !== null) ? ($maintOn === '1') : $cfg['app']['maintenance_mode'];
+        $maintMsg = get_setting('maintenance_message');
+        if ($maintMsg === null || $maintMsg === '') { $maintMsg = $cfg['app']['maintenance_message']; }
+
         $b = body_json();
         $loginId = trim(pval($b, 'team_no', pval($b, 'login_id', '')));
         $r = Auth::login($loginId, pval($b, 'password', ''), pval($b, 'mode', 'real'));
         if (!$r) {
             json_out(array('error' => 'invalid_credentials'), 401);
         }
+        // Maintenance lock blocks everyone except admin, so an admin can
+        // always get in to lift the lock via the separate control page.
+        if ($maintOn && $r['role'] !== 'admin') {
+            json_out(array('error' => 'maintenance', 'message' => $maintMsg), 503);
+        }
         json_out($r);
+    }
+
+    if ($path === '/api/settings/maintenance' && $method === 'GET') {
+        Auth::require_auth(array('admin'));
+        $cfg = config();
+        $on = get_setting('maintenance_mode');
+        $on = ($on !== null) ? ($on === '1') : $cfg['app']['maintenance_mode'];
+        $msg = get_setting('maintenance_message');
+        if ($msg === null || $msg === '') { $msg = $cfg['app']['maintenance_message']; }
+        json_out(array('enabled' => $on, 'message' => $msg));
+    }
+    if ($path === '/api/settings/maintenance' && $method === 'POST') {
+        $s = Auth::require_auth(array('admin'));
+        $b = body_json();
+        set_setting('maintenance_mode', pval($b, 'enabled') ? '1' : '0');
+        if (pval($b, 'message') !== null) {
+            set_setting('maintenance_message', trim((string) pval($b, 'message', '')));
+        }
+        log_activity('user#' . $s['user_id'], 'maintenance_toggle', 'setting', null, pval($b, 'enabled') ? 'on' : 'off');
+        json_out(array('ok' => true));
     }
 
     if ($path === '/api/session') {

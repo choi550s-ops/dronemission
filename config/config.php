@@ -2,10 +2,11 @@
 // Config loader + small compatibility polyfills (works on PHP 5.4+).
 
 // ---- temporary login lockout ----
-// Set to true to block all logins (code-level switch — flip and redeploy
-// to toggle). Overridden by MAINTENANCE_MODE=1/0 in .env if that's set,
-// so the server can also be toggled directly without a redeploy.
-define('MAINTENANCE_MODE_DEFAULT', true);
+// Fallback default used only when no row exists yet in iuccs_settings
+// (maintenance_mode) -- once the settings table has a value, that value
+// always wins. Toggle live via the separate 관제 control page instead of
+// editing this.
+define('MAINTENANCE_MODE_DEFAULT', false);
 
 // ---- compatibility helpers ----
 if (!function_exists('pval')) {
